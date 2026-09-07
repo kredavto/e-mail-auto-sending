@@ -1,0 +1,36 @@
+import { Node, mergeAttributes } from "@tiptap/core";
+
+export const Variable = Node.create({
+  name: "variable",
+  group: "inline",
+  inline: true,
+  atom: true,
+  addAttributes: () => ({ name: { default: "first_name" } }),
+  parseHTML: () => [{ tag: "span[data-variable]", getAttrs: (element) => ({ name: (element as HTMLElement).dataset.variable }) }],
+  renderHTML: ({ HTMLAttributes }) => ["span", mergeAttributes({ class: "variable-chip", "data-variable": HTMLAttributes.name }, HTMLAttributes), `{{${HTMLAttributes.name}}}`],
+});
+
+function blockNode(name: string, tag: string, className: string) {
+  return Node.create({
+    name,
+    group: "block",
+    content: "block+",
+    defining: true,
+    parseHTML: () => [{ tag: `${tag}[data-block='${name}']` }],
+    renderHTML: ({ HTMLAttributes }) => [tag, mergeAttributes({ "data-block": name, class: className }, HTMLAttributes), 0],
+  });
+}
+
+export const SignatureBlock = blockNode("signatureBlock", "section", "border-t border-stone-200 pt-4 mt-6 text-sm");
+export const CaseStudyBlock = blockNode("caseStudyBlock", "aside", "border-l-4 border-acid bg-stone-50 p-4 my-5");
+export const UnsubscribeBlock = blockNode("unsubscribeBlock", "footer", "text-xs text-stone-500 mt-8");
+
+export const CTAButton = Node.create({
+  name: "ctaButton",
+  group: "block",
+  atom: true,
+  addAttributes: () => ({ label: { default: "Подробнее" }, url: { default: "https://" } }),
+  parseHTML: () => [{ tag: "a[data-cta]" }],
+  renderHTML: ({ HTMLAttributes }) => ["a", mergeAttributes({ "data-cta": "true", href: HTMLAttributes.url, class: "inline-block rounded-md bg-acid px-5 py-3 font-semibold no-underline my-4" }, HTMLAttributes), HTMLAttributes.label],
+});
+

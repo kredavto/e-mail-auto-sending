@@ -1,0 +1,40 @@
+[project]
+name = "premium-b2b-mailer"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests", "app/modules"]
+pythonpath = ["."]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+ignore = ["B008"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+exclude = ["alembic"]
+
+[[tool.mypy.overrides]]
+module = [
+    "bleach.*",
+    "boto3.*",
+    "botocore.*",
+    "cryptography.*",
+    "openpyxl.*",
+    "celery.*",
+    "kombu.*",
+]
+ignore_missing_imports = true

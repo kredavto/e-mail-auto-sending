@@ -1,0 +1,186 @@
+import html
+import re
+from typing import Any
+
+import bleach
+from bleach.css_sanitizer import CSSSanitizer
+from jinja2 import Environment, StrictUndefined, select_autoescape
+
+VARIABLE_RE = re.compile(r"{{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}")
+ALLOWED_TAGS = [
+    "p",
+    "br",
+    "strong",
+    "em",
+    "u",
+    "a",
+    "ul",
+    "ol",
+    "li",
+    "blockquote",
+    "span",
+    "div",
+    "table",
+    "tbody",
+    "tr",
+    "td",
+    "img",
+]
+ALLOWED_ATTRS = {
+    "a": ["href", "style"],
+    "span": ["style", "data-variable"],
+    "div": ["style"],
+    "table": ["style", "role", "width", "cellpadding", "cellspacing"],
+    "td": ["style", "align"],
+    "img": ["src", "alt", "width", "height", "style"],
+}
+CSS_SANITIZER = CSSSanitizer(
+    allowed_css_properties=[
+        "background",
+        "background-color",
+        "border",
+        "border-left",
+        "border-radius",
+        "color",
+        "display",
+        "font-family",
+        "font-size",
+        "font-weight",
+        "height",
+        "line-height",
+        "margin",
+        "margin-top",
+        "max-width",
+        "padding",
+        "padding-left",
+        "text-align",
+        "text-decoration",
+        "width",
+    ]
+)
+
+
+class EditorService:
+    def compile(self, state: dict[str, object]) -> tuple[str, str, list[str], int, list[str]]:
+        content = state.get("content", [])
+        nodes = content if isinstance(content, list) else []
+        body = "".join(self._node(node) for node in nodes if isinstance(node, dict))
+        clean = bleach.clean(
+            body,
+            tags=ALLOWED_TAGS,
+            attributes=ALLOWED_ATTRS,
+            protocols=["http", "https", "mailto"],
+            css_sanitizer=CSS_SANITIZER,
+            strip=True,
+        )
+        wrapped = (
+            '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+            'style="background:#f4f2ed;width:100%">'
+            '<tr><td align="center" style="padding:24px 12px">'
+            '<!--[if mso]><table role="presentation" width="640" cellpadding="0" '
+            'cellspacing="0"><tr><td><![endif]-->'
+            '<table role="presentation" width="640" cellpadding="0" cellspacing="0" '
+            'style="width:100%;max-width:640px;background:#ffffff">'
+            '<tr><td style="padding:32px;font-family:Arial,Helvetica,sans-serif;'
+            f'font-size:16px;line-height:1.55;color:#1c2520">{clean}</td></tr>'
+            "</table><!--[if mso]></td></tr></table><![endif]--></td></tr></table>"
+        )
+        text = self._text(nodes).strip()
+        variables = sorted(set(VARIABLE_RE.findall(f"{body} {text}")))
+        warnings: list[str] = []
+        score = 100
+        if not text:
+            warnings.append("Пустое письмо")
+            score -= 60
+        if len(text) > 1500:
+            warnings.append("Письмо длиннее 1500 символов")
+            score -= 15
+        if "unsubscribe" not in body.casefold():
+            warnings.append("Нет блока отписки")
+            score -= 15
+        if not any(node.get("type") == "ctaButton" for node in nodes if isinstance(node, dict)):
+            warnings.append("Нет CTA-кнопки")
+            score -= 10
+        return wrapped, text, variables, max(0, score), warnings
+
+    def preview(self, state: dict[str, object], variables: dict[str, str]) -> str:
+        compiled, _, _, _, _ = self.compile(state)
+        environment = Environment(
+            autoescape=select_autoescape(default=True), undefined=StrictUndefined
+        )
+        return environment.from_string(compiled).render(**variables)
+
+    def _node(self, node: dict[str, Any]) -> str:
+        node_type = node.get("type", "")
+        attrs = node.get("attrs") or {}
+        children = node.get("content") or []
+        inner = "".join(self._node(child) for child in children if isinstance(child, dict))
+        if node_type == "text":
+            value = html.escape(str(node.get("text", "")))
+            for mark in node.get("marks") or []:
+                mark_type = str(mark.get("type", "")) if isinstance(mark, dict) else ""
+                value = {
+                    "bold": f"<strong>{value}</strong>",
+                    "italic": f"<em>{value}</em>",
+                    "underline": f"<u>{value}</u>",
+                }.get(mark_type, value)
+            return value
+        if node_type == "paragraph":
+            return f'<p style="margin:0 0 16px">{inner or "&nbsp;"}</p>'
+        if node_type == "heading":
+            return (
+                '<p style="margin:0 0 18px;font-size:24px;line-height:1.25;'
+                f'font-weight:bold">{inner}</p>'
+            )
+        if node_type == "bulletList":
+            return f'<ul style="margin:0 0 16px;padding-left:24px">{inner}</ul>'
+        if node_type == "orderedList":
+            return f'<ol style="margin:0 0 16px;padding-left:24px">{inner}</ol>'
+        if node_type == "listItem":
+            return f"<li>{inner}</li>"
+        if node_type == "variable":
+            name = str(attrs.get("name", ""))
+            return f'<span data-variable="{html.escape(name)}">{{{{{html.escape(name)}}}}}</span>'
+        if node_type == "ctaButton":
+            label, url = (
+                html.escape(str(attrs.get("label", "Подробнее"))),
+                html.escape(str(attrs.get("url", "#")), quote=True),
+            )
+            return (
+                '<table role="presentation" cellpadding="0" cellspacing="0" '
+                'style="margin:24px 0"><tr><td style="background:#d6f04a;border-radius:6px">'
+                f'<a href="{url}" style="display:inline-block;padding:13px 22px;color:#172016;'
+                f'text-decoration:none;font-weight:bold">{label}</a></td></tr></table>'
+            )
+        if node_type == "signatureBlock":
+            return (
+                '<div style="margin-top:24px;border-top:1px solid #ddd;'
+                f'padding-top:16px">{inner}</div>'
+            )
+        if node_type == "caseStudyBlock":
+            return (
+                '<div style="margin:20px 0;padding:16px;border-left:4px solid #d6f04a;'
+                f'background:#f7f8f3">{inner}</div>'
+            )
+        if node_type == "unsubscribeBlock":
+            content = inner or "Чтобы отписаться, нажмите unsubscribe"
+            return f'<p style="margin-top:24px;color:#69736b;font-size:12px">{content}</p>'
+        if node_type == "hardBreak":
+            return "<br>"
+        return inner
+
+    def _text(self, nodes: list[object]) -> str:
+        chunks: list[str] = []
+        for item in nodes:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "text":
+                chunks.append(str(item.get("text", "")))
+            elif item.get("type") == "variable":
+                chunks.append("{{" + str((item.get("attrs") or {}).get("name", "")) + "}}")
+            children = item.get("content")
+            if isinstance(children, list):
+                chunks.append(self._text(children))
+            if item.get("type") in {"paragraph", "heading", "listItem", "ctaButton"}:
+                chunks.append("\n")
+        return "".join(chunks)

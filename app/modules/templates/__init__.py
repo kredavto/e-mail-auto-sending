@@ -1,0 +1,1 @@
+"""Versioned email templates."""

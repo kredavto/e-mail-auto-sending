@@ -1,0 +1,63 @@
+[
+  {
+    "name": "Создание сайтов премиум-уровня",
+    "slug": "premium-sites",
+    "description": "Премиальные сайты для B2B-компаний",
+    "category": "digital",
+    "average_check": 100000,
+    "monthly_fee": 20000,
+    "setup_fee": 0,
+    "target_audience": {"industries": ["Финансы", "Промышленность", "IT", "Консалтинг"], "company_sizes": ["100-500", "500+"], "annual_revenue": ["300M+"]}
+  },
+  {
+    "name": "Автоматизация найма и обучения персонала",
+    "slug": "hr-automation",
+    "description": "Автоматизация HR-процессов",
+    "category": "hr",
+    "average_check": 150000,
+    "monthly_fee": 30000,
+    "setup_fee": 50000,
+    "target_audience": {"industries": ["IT", "Ритейл", "Производство", "Финансы"], "company_sizes": ["200+", "500+"], "annual_revenue": ["500M+"]}
+  },
+  {
+    "name": "Создание сети амбассадоров / агентов",
+    "slug": "ambassador-network",
+    "description": "Партнёрские и агентские сети",
+    "category": "marketing",
+    "average_check": 200000,
+    "monthly_fee": 0,
+    "setup_fee": 100000,
+    "target_audience": {"industries": ["B2B-услуги", "Финансы", "Страхование"], "company_sizes": ["50+"], "annual_revenue": ["100M+"]}
+  },
+  {
+    "name": "Открытие расчётного счета с бесплатным обслуживанием",
+    "slug": "business-account",
+    "description": "РКО без платы за обслуживание",
+    "category": "banking",
+    "average_check": 0,
+    "monthly_fee": 0,
+    "setup_fee": 0,
+    "target_audience": {"industries": ["Любые"], "company_sizes": ["1-500"], "annual_revenue": ["Любая"]}
+  },
+  {
+    "name": "Кредитование бизнеса",
+    "slug": "business-lending",
+    "description": "Подбор банковского финансирования",
+    "category": "banking",
+    "average_check": 0,
+    "monthly_fee": 0,
+    "setup_fee": 0,
+    "target_audience": {"industries": ["Любые"], "company_sizes": ["10+"], "annual_revenue": ["50M+"]}
+  },
+  {
+    "name": "Выдача банковских гарантий",
+    "slug": "bank-guarantees",
+    "description": "Банковские гарантии для тендеров и контрактов",
+    "category": "banking",
+    "average_check": 0,
+    "monthly_fee": 0,
+    "setup_fee": 0,
+    "target_audience": {"industries": ["Строительство", "IT", "Промышленность"], "company_sizes": ["10+"], "annual_revenue": ["30M+"]}
+  }
+]
+
