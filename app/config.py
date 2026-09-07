@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     app_secret_key: str = "development-only-secret-key-change-me"
     database_url: str = "postgresql+asyncpg://mailer_app:mailer_app_local@localhost:5432/mailer"
     migration_database_url: str | None = None
+    database_null_pool: bool = False
     redis_url: str = "redis://localhost:6379/0"
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
     access_token_minutes: int = 15

@@ -6,6 +6,7 @@ from sqlalchemy import DateTime, MetaData, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.asyncio import AsyncAttrs, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.pool import NullPool
 
 from app.config import get_settings
 
@@ -34,7 +35,13 @@ class TimestampMixin:
 
 
 settings = get_settings()
-engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+if settings.database_null_pool:
+    # Celery tasks use asyncio.run(), which creates a fresh event loop per task.
+    # Asyncpg connections cannot be reused across those loops, so workers must
+    # open task-scoped connections instead of keeping them in a process pool.
+    engine = create_async_engine(settings.database_url, pool_pre_ping=True, poolclass=NullPool)
+else:
+    engine = create_async_engine(settings.database_url, pool_pre_ping=True)
 async_session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
 

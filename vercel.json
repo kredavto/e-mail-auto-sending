@@ -5,6 +5,14 @@
   "outputDirectory": "frontend/dist",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://5.129.234.72/mailer/api/:path*"
+    },
+    {
+      "source": "/backend-health",
+      "destination": "https://5.129.234.72/mailer/health"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

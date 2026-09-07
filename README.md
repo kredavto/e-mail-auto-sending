@@ -34,6 +34,31 @@ privileges. Для реальной отправки задайте `SMTP_HOST`,
 `DEFAULT_SENDER_DOMAIN` и безопасный `APP_SECRET_KEY` через `.env`; полный список находится в
 [.env.example](.env.example).
 
+## Production deployment
+
+Рабочая схема разделена на два окружения:
+
+- frontend: <https://premium-b2b-mailer.vercel.app>;
+- API: Vercel rewrite `/api/*` → `https://5.129.234.72/mailer/api/*`;
+- backend stack: `/opt/premium-b2b-mailer` на NL-server;
+- PostgreSQL, Redis, MinIO и Mailpit доступны только внутри Docker network;
+- наружу опубликован только API через существующий TLS reverse proxy.
+
+Первичное развёртывание на сервере:
+
+```bash
+cd /opt/premium-b2b-mailer
+./infrastructure/production/bootstrap-env.sh .env
+docker compose --env-file .env -f docker-compose.production.yml pull
+docker compose --env-file .env -f docker-compose.production.yml up -d --build
+```
+
+`bootstrap-env.sh` создаёт `.env` с правами `0600` и случайными production-секретами, не
+перезаписывая существующий файл. По умолчанию SMTP направлен в закрытый Mailpit, поэтому весь
+email pipeline работает без отправки сообщений реальным адресатам. Для реальной доставки замените
+`SMTP_*`/`DEFAULT_SENDER_DOMAIN` либо включите SES в серверном `.env` и перезапустите API/worker.
+Ключи внешних CRM, enrichment и платёжных провайдеров также задаются только в серверном `.env`.
+
 ## Первый сценарий API
 
 1. `POST /api/v1/auth/register` и `POST /api/v1/auth/login`.
