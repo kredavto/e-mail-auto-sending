@@ -77,6 +77,32 @@ privileges. Для реальной отправки задайте `SMTP_HOST`,
 - PostgreSQL, Redis, MinIO и Mailpit доступны только внутри Docker network;
 - наружу опубликован только API через существующий TLS reverse proxy.
 
+### Общий HTTPS-прокси: восстановление 9 сентября 2026
+
+Прокси `tiktokbot-nginx-1` использует `/opt/tiktokbot/nginx.conf` и основной
+`/opt/tiktokbot/docker-compose.yml`. В основном compose закреплены read-only mounts
+`/etc/letsencrypt` и `/var/www/certbot`: одного дополнительного override-файла
+недостаточно, если следующее развёртывание запускается только с основным compose.
+
+Существующие HTTP-маршруты сохранены. Добавлены HTTP-01 challenge location
+`/.well-known/acme-challenge/` с root `/var/www/certbot` и отдельный TLS server на 443
+для `5.129.234.72`, проксирующий `/mailer/` в `premium-b2b-mailer-api:8000`.
+Используется Docker DNS resolver `127.0.0.11`, чтобы пересоздание API не ломало адресацию.
+Проверка соединения с фронтендом: `https://premium-b2b-mailer.vercel.app/backend-health`.
+
+Рабочий клиент IP-сертификатов — `/opt/certbot-venv/bin/certbot` (5.7.0),
+плановое продление выполняет `certbot-ip-renew.timer`. Старый `/usr/bin/certbot`
+(2.9.0) не подходит для IP-сертификатов. Проверять продление следует командой:
+
+```bash
+/opt/certbot-venv/bin/certbot renew --cert-name 5.129.234.72 --dry-run --no-random-sleep-on-renew --run-deploy-hooks
+```
+
+Существующий hook `/usr/local/sbin/reload-tiktokbot-nginx` проверяет конфигурацию
+и перезагружает Nginx после обновления сертификата. Проверка prod API, скрытого CTA,
+HTTP health другого приложения и тест продления прошли. Резервные копии обоих
+исходных файлов прокси: `/opt/tiktokbot/backups/mailer-https-20260909/`.
+
 Первичное развёртывание на сервере:
 
 ```bash
