@@ -22,6 +22,9 @@ class ContactService:
         if await self.repo.by_email(email):
             raise ConflictError("Контакт с таким email уже существует")
         last_name, first_name, patronymic = parse_full_name(data.full_name)
+        last_name = data.last_name if data.last_name is not None else last_name
+        first_name = data.first_name if data.first_name is not None else first_name
+        patronymic = data.patronymic if data.patronymic is not None else patronymic
         return await self.repo.add(
             Contact(
                 workspace_id=self.workspace_id,
@@ -29,7 +32,7 @@ class ContactService:
                 last_name=last_name,
                 first_name=first_name,
                 patronymic=patronymic,
-                **data.model_dump(exclude={"email"}),
+                **data.model_dump(exclude={"email", "first_name", "last_name", "patronymic"}),
             )
         )
 

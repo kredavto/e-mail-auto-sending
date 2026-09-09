@@ -1,0 +1,11 @@
+.env*
+.venv/
+.venv312/
+.codex-release/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+**/__pycache__/
+frontend/node_modules/
+frontend/test-results/
+frontend/playwright-report/

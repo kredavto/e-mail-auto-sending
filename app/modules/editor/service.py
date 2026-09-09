@@ -1,10 +1,13 @@
 import html
 import re
 from typing import Any
+from urllib.parse import urlsplit
 
 import bleach
 from bleach.css_sanitizer import CSSSanitizer
 from jinja2 import Environment, StrictUndefined, select_autoescape
+
+from app.core.exceptions import AppError
 
 VARIABLE_RE = re.compile(r"{{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}")
 ALLOWED_TAGS = [
@@ -27,7 +30,7 @@ ALLOWED_TAGS = [
     "img",
 ]
 ALLOWED_ATTRS = {
-    "a": ["href", "style"],
+    "a": ["href", "style", "target", "rel"],
     "span": ["style", "data-variable"],
     "div": ["style"],
     "table": ["style", "role", "width", "cellpadding", "cellspacing"],
@@ -142,14 +145,28 @@ class EditorService:
             name = str(attrs.get("name", ""))
             return f'<span data-variable="{html.escape(name)}">{{{{{html.escape(name)}}}}}</span>'
         if node_type == "ctaButton":
+            raw_url = str(attrs.get("url", "")).strip()
+            try:
+                parsed = urlsplit(raw_url)
+                valid_url = (
+                    parsed.scheme in {"http", "https"}
+                    and bool(parsed.netloc)
+                    and not parsed.username
+                    and not parsed.password
+                )
+            except ValueError:
+                valid_url = False
+            if not valid_url:
+                raise AppError("CTA: укажите полный адрес с https:// или http://")
             label, url = (
                 html.escape(str(attrs.get("label", "Подробнее"))),
-                html.escape(str(attrs.get("url", "#")), quote=True),
+                html.escape(raw_url, quote=True),
             )
             return (
                 '<table role="presentation" cellpadding="0" cellspacing="0" '
                 'style="margin:24px 0"><tr><td style="background:#d6f04a;border-radius:6px">'
-                f'<a href="{url}" style="display:inline-block;padding:13px 22px;color:#172016;'
+                f'<a href="{url}" target="_blank" rel="noopener noreferrer" '
+                'style="display:inline-block;padding:13px 22px;color:#172016;'
                 f'text-decoration:none;font-weight:bold">{label}</a></td></tr></table>'
             )
         if node_type == "signatureBlock":
@@ -178,6 +195,9 @@ class EditorService:
                 chunks.append(str(item.get("text", "")))
             elif item.get("type") == "variable":
                 chunks.append("{{" + str((item.get("attrs") or {}).get("name", "")) + "}}")
+            elif item.get("type") == "ctaButton":
+                attrs = item.get("attrs") or {}
+                chunks.append(f'{attrs.get("label", "Подробнее")}: {attrs.get("url", "")}')
             children = item.get("content")
             if isinstance(children, list):
                 chunks.append(self._text(children))

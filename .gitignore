@@ -14,3 +14,10 @@ frontend/dist/
 frontend/*.tsbuildinfo
 .pnpm-store/
 uploads/
+.vercel/
+frontend/test-results/
+frontend/playwright-report/
+.codex-release/
+
+.vercel
+.env*

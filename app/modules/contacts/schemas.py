@@ -23,7 +23,10 @@ class ContactBase(BaseModel):
 
 
 class ContactCreate(ContactBase):
-    pass
+    # Preserve explicit spreadsheet name parts instead of guessing their order.
+    first_name: str | None = Field(default=None, max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
+    patronymic: str | None = Field(default=None, max_length=100)
 
 
 class ContactUpdate(BaseModel):

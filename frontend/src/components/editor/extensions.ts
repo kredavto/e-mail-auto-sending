@@ -1,4 +1,5 @@
 import { Node, mergeAttributes } from "@tiptap/core";
+import { safeCtaUrl } from "../../lib/mailing";
 
 export const Variable = Node.create({
   name: "variable",
@@ -29,8 +30,8 @@ export const CTAButton = Node.create({
   name: "ctaButton",
   group: "block",
   atom: true,
-  addAttributes: () => ({ label: { default: "Подробнее" }, url: { default: "https://" } }),
+  addAttributes: () => ({ label: { default: "Подробнее", parseHTML: element => element.textContent, rendered: false }, url: { default: "", parseHTML: element => element.getAttribute("href"), rendered: false } }),
   parseHTML: () => [{ tag: "a[data-cta]" }],
-  renderHTML: ({ HTMLAttributes }) => ["a", mergeAttributes({ "data-cta": "true", href: HTMLAttributes.url, class: "inline-block rounded-md bg-acid px-5 py-3 font-semibold no-underline my-4" }, HTMLAttributes), HTMLAttributes.label],
+  renderHTML: ({ node, HTMLAttributes }) => ["a", mergeAttributes(HTMLAttributes, { "data-cta": "true", href: safeCtaUrl(node.attrs.url) ?? undefined, target: "_blank", rel: "noopener noreferrer", class: "inline-block rounded-md bg-acid px-5 py-3 font-semibold no-underline my-4" }), node.attrs.label],
 });
 

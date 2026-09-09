@@ -12,6 +12,7 @@ from app.modules.ab_testing.models import ABTest, ABTestVariant
 from app.modules.ab_testing.service import ABTestingService
 from app.modules.campaigns.models import Campaign
 from app.modules.contacts.models import Contact
+from app.modules.contacts.personalization import contact_variables
 from app.modules.linkedin.models import LinkedInProfile
 from app.modules.omnichannel.models import OmnichannelEvent
 from app.modules.products.models import Product
@@ -86,12 +87,7 @@ class OmnichannelOrchestrator:
         variant = await self._ab_variant(campaign.id, contact.id)
         if variant and variant.template_id:
             template = await self.db.get(Template, variant.template_id)
-        context = {
-            "first_name": contact.first_name,
-            "company": contact.company,
-            "position": contact.position,
-            "product_name": product.name,
-        }
+        context = contact_variables(contact, product.name)
         environment = Environment(
             autoescape=select_autoescape(default=True), undefined=StrictUndefined
         )
@@ -157,10 +153,7 @@ class OmnichannelOrchestrator:
             Environment(undefined=StrictUndefined)
             .from_string(source)
             .render(
-                first_name=contact.first_name,
-                company=contact.company,
-                position=contact.position,
-                product_name=product.name,
+                **contact_variables(contact, product.name),
             )
         )
 
