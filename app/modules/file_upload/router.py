@@ -1,7 +1,7 @@
 from asyncio import to_thread
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import TenantContext, get_tenant_context
@@ -11,8 +11,28 @@ from app.modules.contacts.service import ContactService
 from app.modules.file_upload.images import MAX_IMAGE_BYTES, EmailImageService
 from app.modules.file_upload.schemas import FileResponse, ParseRequest, PreviewResponse
 from app.modules.file_upload.service import FileService
+from app.modules.file_upload.videos import MAX_VIDEO_BYTES, EmailVideoService
 
 router = APIRouter(prefix="/files", tags=["files"])
+
+
+@router.post("/videos", status_code=201)
+async def upload_email_video(
+    file: UploadFile = File(...), tenant: TenantContext = Depends(get_tenant_context)
+) -> dict[str, object]:
+    body = await file.read(MAX_VIDEO_BYTES + 1)
+    return await EmailVideoService().upload(body, tenant.workspace_id)
+
+
+@router.get("/videos/{filename}")
+@router.head("/videos/{filename}", include_in_schema=False)
+async def email_video(filename: str, request: Request) -> Response:
+    return await to_thread(
+        EmailVideoService().response,
+        filename,
+        request.headers.get("range"),
+        request.method == "HEAD",
+    )
 
 
 @router.post("/images", status_code=201)

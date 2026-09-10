@@ -49,3 +49,20 @@ export const EmailImage = Node.create({
   })],
 });
 
+export const EmailVideo = Node.create({
+  name: "emailVideo",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes: () => ({
+    src: { default: "", rendered: false, parseHTML: element => element.getAttribute("data-video-src") },
+    poster: { default: "", rendered: false, parseHTML: element => element.querySelector("img")?.getAttribute("src") },
+    alt: { default: "", rendered: false, parseHTML: element => element.querySelector("img")?.getAttribute("alt") },
+  }),
+  parseHTML: () => [{ tag: "div[data-email-video]" }],
+  renderHTML: ({ node }) => ["div", { "data-email-video": "true", "data-video-src": safeCtaUrl(node.attrs.src) ?? undefined, style: "width:25%;margin:16px 0;" },
+    ["img", { src: safeCtaUrl(node.attrs.poster) ?? undefined, alt: node.attrs.alt || "Смотреть видео", style: "display:block;width:100%;height:auto;" }],
+    ["span", { style: "font-size:12px;" }, `▶ ${node.attrs.alt || "Смотреть видео"}`],
+  ],
+});
+

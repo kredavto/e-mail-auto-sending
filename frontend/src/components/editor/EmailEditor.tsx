@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { baseVariables, contactVariables, initialDocument, interpolate, safeCtaUrl, stages, type Contact, type MailTemplate, type Stage } from "../../lib/mailing";
-import { CaseStudyBlock, CTAButton, EmailImage, SignatureBlock, UnsubscribeBlock, Variable } from "./extensions";
+import { CaseStudyBlock, CTAButton, EmailImage, EmailVideo, SignatureBlock, UnsubscribeBlock, Variable } from "./extensions";
 import { ImageUpload } from "./ImageUpload";
 
 type CompileResult = { html: string; text: string; variables: string[]; quality_score: number; warnings: string[] };
@@ -37,7 +37,7 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
   const revision = useRef(0);
   function changed() { revision.current++; setResult(null); setQuality(null); setPreview(""); setNotice(""); onDirty(true); }
   const editor = useEditor({
-    extensions: [StarterKit, Placeholder.configure({ placeholder: "Напишите короткое, конкретное письмо..." }), Variable, SignatureBlock, CaseStudyBlock, CTAButton, UnsubscribeBlock, EmailImage],
+    extensions: [StarterKit, Placeholder.configure({ placeholder: "Напишите короткое, конкретное письмо..." }), Variable, SignatureBlock, CaseStudyBlock, CTAButton, UnsubscribeBlock, EmailImage, EmailVideo],
     content: template?.editor_state ?? initialDocument,
     onUpdate: changed,
   });
@@ -112,7 +112,7 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
           <label className="field">Переменная<input list="mail-variables" value={variableName} onChange={e => setVariableName(e.target.value)} /><datalist id="mail-variables">{variables.map(v => <option key={v} value={v} />)}</datalist></label>
           <button className="button" disabled={!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(variableName)} onClick={() => editor.chain().focus().insertContent({ type: "variable", attrs: { name: variableName } }).run()}>+ Переменная</button>
           <button onClick={() => { setShowImage(false); openCta(); }} className="button primary">+ CTA</button>
-          <button onClick={() => { setShowCta(false); setShowImage(!showImage); }} className="button">+ Изображение</button>
+          <button onClick={() => { setShowCta(false); setShowImage(!showImage); }} className="button">+ Фото / видео</button>
         </fieldset>
         {showImage && <ImageUpload editor={editor} workspaceId={workspaceId} onBusy={setUploading} onClose={() => setShowImage(false)} />}
         {showCta && <form onSubmit={insertCta} className="space-y-3 border-b border-ink/10 bg-acid/10 p-5">

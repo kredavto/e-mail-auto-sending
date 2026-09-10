@@ -170,6 +170,26 @@ class EditorService:
                 'style="display:inline-block;padding:13px 22px;color:#172016;'
                 f'text-decoration:none;font-weight:bold">{label}</a></td></tr></table>'
             )
+        if node_type == "emailVideo":
+            source, poster = str(attrs.get("src", "")), str(attrs.get("poster", ""))
+            base = get_settings().public_base_url.rstrip("/") + "/api/v1/files/"
+            if not source.startswith(base + "videos/") or not re.fullmatch(
+                r"[a-f0-9]{32}\.mp4", source[len(base + "videos/") :]
+            ):
+                raise AppError("Загрузите MP4 через кнопку «+ Фото / видео».")
+            token = source.rsplit("/", 1)[-1].removesuffix(".mp4")
+            if poster != f"{base}images/{token}.png":
+                raise AppError("Некорректное превью видео. Загрузите MP4 повторно.")
+            label = html.escape(str(attrs.get("alt") or "Смотреть видео")[:300], quote=True)
+            label = label.replace("{", "&#123;").replace("}", "&#125;")
+            return (
+                f'<a href="{html.escape(source, quote=True)}" target="_blank" '
+                'rel="noopener noreferrer" style="display:block;width:25%;max-width:144px;'
+                'margin:16px 0;color:#142019;text-decoration:underline">'
+                f'<img src="{html.escape(poster, quote=True)}" alt="{label}" width="144" '
+                'style="display:block;width:100%;max-width:144px;height:auto">'
+                f'<span style="font-size:12px">▶ {label}</span></a>'
+            )
         if node_type == "emailImage":
             source = str(attrs.get("src", ""))
             prefix = get_settings().public_base_url.rstrip("/") + "/api/v1/files/images/"
@@ -214,6 +234,8 @@ class EditorService:
                 chunks.append(f'{attrs.get("label", "Подробнее")}: {attrs.get("url", "")}')
             elif item.get("type") == "emailImage":
                 chunks.append("[Изображение]\n")
+            elif item.get("type") == "emailVideo":
+                chunks.append(f'Смотреть видео: {(item.get("attrs") or {}).get("src", "")}\n')
             children = item.get("content")
             if isinstance(children, list):
                 chunks.append(self._text(children))
