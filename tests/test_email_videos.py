@@ -143,6 +143,8 @@ def test_upload_public_playback_and_compilation(monkeypatch, media):
         response = client.get(path, headers={"Range": "bytes=0-1"})
         assert response.status_code == 206 and response.content == M4P_RESULT[:2]
         assert response.headers["content-type"] == "video/mp4"
+        assert response.headers["cache-control"] == "no-store"
+        assert response.headers["vercel-cdn-cache-control"] == "no-store"
         assert response.headers["content-range"].startswith("bytes 0-1/")
         assert client.get(path).content == M4P_RESULT
         assert client.head(path).content == b""

@@ -226,7 +226,10 @@ class EmailVideoService(EmailImageService):
             selection = byte_range(range_header, size)
             headers = {
                 "Accept-Ranges": "bytes",
-                "Cache-Control": "public, max-age=31536000, immutable",
+                # External rewrite caches may reuse one 206 response for a different Range.
+                "Cache-Control": "no-store",
+                "CDN-Cache-Control": "no-store",
+                "Vercel-CDN-Cache-Control": "no-store",
                 "Content-Disposition": "inline",
                 "X-Content-Type-Options": "nosniff",
                 "Content-Length": str(size),
