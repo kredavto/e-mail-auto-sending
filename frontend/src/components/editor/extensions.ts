@@ -35,3 +35,17 @@ export const CTAButton = Node.create({
   renderHTML: ({ node, HTMLAttributes }) => ["a", mergeAttributes(HTMLAttributes, { "data-cta": "true", href: safeCtaUrl(node.attrs.url) ?? undefined, target: "_blank", rel: "noopener noreferrer", class: "inline-block rounded-md bg-acid px-5 py-3 font-semibold no-underline my-4" }), node.attrs.label],
 });
 
+export const EmailImage = Node.create({
+  name: "emailImage",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes: () => ({ src: { default: "" }, alt: { default: "" } }),
+  parseHTML: () => [{ tag: "img[data-email-image]" }],
+  renderHTML: ({ HTMLAttributes }) => ["img", mergeAttributes(HTMLAttributes, {
+    src: safeCtaUrl(HTMLAttributes.src) ?? undefined,
+    "data-email-image": "true",
+    style: "display:block;width:25%;height:auto;margin:16px 0;",
+  })],
+});
+

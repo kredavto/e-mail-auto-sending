@@ -1,16 +1,42 @@
+from asyncio import to_thread
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import TenantContext, get_tenant_context
 from app.database import get_db
 from app.modules.contacts.schemas import BulkResult, ContactCreate
 from app.modules.contacts.service import ContactService
+from app.modules.file_upload.images import MAX_IMAGE_BYTES, EmailImageService
 from app.modules.file_upload.schemas import FileResponse, ParseRequest, PreviewResponse
 from app.modules.file_upload.service import FileService
 
 router = APIRouter(prefix="/files", tags=["files"])
+
+
+@router.post("/images", status_code=201)
+async def upload_email_image(
+    file: UploadFile = File(...),
+    tenant: TenantContext = Depends(get_tenant_context),
+) -> dict[str, object]:
+    body = await file.read(MAX_IMAGE_BYTES + 1)
+    return await EmailImageService().upload(body, tenant.workspace_id)
+
+
+@router.get("/images/{filename}")
+async def email_image(filename: str) -> Response:
+    # Deliberately public: email recipients cannot authenticate to this app.
+    # Only random email-image names are accepted; never private uploaded files.
+    body = await to_thread(EmailImageService().download, filename)
+    return Response(
+        content=body,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.post("/upload", response_model=FileResponse, status_code=201)

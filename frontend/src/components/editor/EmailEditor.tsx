@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { baseVariables, contactVariables, initialDocument, interpolate, safeCtaUrl, stages, type Contact, type MailTemplate, type Stage } from "../../lib/mailing";
-import { CaseStudyBlock, CTAButton, SignatureBlock, UnsubscribeBlock, Variable } from "./extensions";
+import { CaseStudyBlock, CTAButton, EmailImage, SignatureBlock, UnsubscribeBlock, Variable } from "./extensions";
+import { ImageUpload } from "./ImageUpload";
 
 type CompileResult = { html: string; text: string; variables: string[]; quality_score: number; warnings: string[] };
 type QualityResult = { score: number; issues: string[]; warnings: string[]; suggestions: string[]; words_count: number };
@@ -25,6 +26,8 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
   const [notice, setNotice] = useState("");
   const [checking, setChecking] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showImage, setShowImage] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [showCta, setShowCta] = useState(false);
   const [ctaLabel, setCtaLabel] = useState("Обсудить задачу");
   const [ctaUrl, setCtaUrl] = useState("");
@@ -34,12 +37,12 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
   const revision = useRef(0);
   function changed() { revision.current++; setResult(null); setQuality(null); setPreview(""); setNotice(""); onDirty(true); }
   const editor = useEditor({
-    extensions: [StarterKit, Placeholder.configure({ placeholder: "Напишите короткое, конкретное письмо..." }), Variable, SignatureBlock, CaseStudyBlock, CTAButton, UnsubscribeBlock],
+    extensions: [StarterKit, Placeholder.configure({ placeholder: "Напишите короткое, конкретное письмо..." }), Variable, SignatureBlock, CaseStudyBlock, CTAButton, UnsubscribeBlock, EmailImage],
     content: template?.editor_state ?? initialDocument,
     onUpdate: changed,
   });
   useEffect(() => { setPreview(""); setResult(null); setQuality(null); revision.current++; }, [contact]);
-  useEffect(() => { editor?.setEditable(!saving, false); }, [editor, saving]);
+  useEffect(() => { editor?.setEditable(!saving && !uploading, false); }, [editor, saving, uploading]);
   async function compile() {
     if (!editor) return;
     setChecking(true); setError(""); setPreview("");
@@ -62,7 +65,7 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
     finally { setChecking(false); }
   }
   async function save(copy = false) {
-    if (!editor || !workspaceId) return;
+    if (!editor || !workspaceId || uploading) return;
     if (!name.trim() || !subject.trim()) { setError("Заполните название шаблона и тему письма."); return; }
     setSaving(true); setError(""); setNotice("");
     try {
@@ -95,27 +98,29 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
     <section className="panel flex flex-wrap items-end gap-3">
       <label className="field grow">Название шаблона<input value={name} maxLength={200} onChange={e => { setName(e.target.value); changed(); }} placeholder="Например: первое предложение директору" disabled={saving} /></label>
       <label className="field">Стадия применения<select value={stage} disabled={saving} onChange={e => { setStage(e.target.value as Stage); changed(); }}>{Object.entries(stages).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-      <button className="button primary" onClick={() => save()} disabled={!workspaceId || saving}>{saving ? "Сохраняем…" : "Сохранить шаблон"}</button>
-      {template && <button className="button" onClick={() => save(true)} disabled={!workspaceId || saving}>Сохранить копию</button>}
+      <button className="button primary" onClick={() => save()} disabled={!workspaceId || saving || uploading}>{saving ? "Сохраняем…" : "Сохранить шаблон"}</button>
+      {template && <button className="button" onClick={() => save(true)} disabled={!workspaceId || saving || uploading}>Сохранить копию</button>}
       <p className="hint w-full">{template ? `Версия ${template.version}. ` : "Новый шаблон. "}Сохраняйте изменения кнопкой выше.{!workspaceId && " Для сохранения войдите в рабочее пространство."}</p>
     </section>
     {error && <p role="alert" className="error-box">{error}</p>}{notice && <p role="status" className="success-box">{notice}</p>}
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <section className="overflow-hidden rounded-2xl border border-ink/10 bg-white shadow-[0_18px_60px_rgba(20,32,25,.08)]">
         <div className="border-b border-ink/10 px-6 py-5"><label className="field">Тема письма<input value={subject} maxLength={255} disabled={saving} onChange={e => { setSubject(e.target.value); changed(); }} /></label></div>
-        <div className="flex flex-wrap items-center gap-2 border-b border-ink/10 bg-paper/60 px-5 py-3">
+        <fieldset disabled={saving || uploading} className="flex flex-wrap items-center gap-2 border-b border-ink/10 bg-paper/60 px-5 py-3">
           <button onClick={() => editor.chain().focus().toggleBold().run()} className="button" aria-pressed={editor.isActive("bold")}>Жирный</button>
           <button onClick={() => editor.chain().focus().toggleBulletList().run()} className="button">Список</button>
           <label className="field">Переменная<input list="mail-variables" value={variableName} onChange={e => setVariableName(e.target.value)} /><datalist id="mail-variables">{variables.map(v => <option key={v} value={v} />)}</datalist></label>
           <button className="button" disabled={!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(variableName)} onClick={() => editor.chain().focus().insertContent({ type: "variable", attrs: { name: variableName } }).run()}>+ Переменная</button>
-          <button onClick={openCta} className="button primary">+ CTA</button>
-        </div>
+          <button onClick={() => { setShowImage(false); openCta(); }} className="button primary">+ CTA</button>
+          <button onClick={() => { setShowCta(false); setShowImage(!showImage); }} className="button">+ Изображение</button>
+        </fieldset>
+        {showImage && <ImageUpload editor={editor} workspaceId={workspaceId} onBusy={setUploading} onClose={() => setShowImage(false)} />}
         {showCta && <form onSubmit={insertCta} className="space-y-3 border-b border-ink/10 bg-acid/10 p-5">
           <p className="font-semibold">Кликабельная кнопка: адрес скрыт за текстом</p><label className="field">Текст кнопки<input value={ctaLabel} onChange={e => setCtaLabel(e.target.value)} required maxLength={200} /></label><label className="field">Адрес ссылки<input type="url" value={ctaUrl} onChange={e => setCtaUrl(e.target.value)} placeholder="https://ваш-сайт.ru/встреча" required /></label>
           {ctaError && <p role="alert" className="error-box">{ctaError}</p>}<button className="button primary">Вставить / обновить CTA</button> <button type="button" className="button" onClick={() => setShowCta(false)}>Отмена</button>
         </form>}
         <EditorContent editor={editor} className="editor-content px-7 py-7" />
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 px-6 py-4"><span className="hint">Переход по CTA доступен в предпросмотре ниже.</span><button onClick={compile} disabled={checking || saving} className="button primary">{checking ? "Проверяем…" : "Проверить письмо"}</button></div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 px-6 py-4"><span className="hint">Переход по CTA доступен в предпросмотре ниже.</span><button onClick={compile} disabled={checking || saving || uploading} className="button primary">{checking ? "Проверяем…" : "Проверить письмо"}</button></div>
       </section>
       <aside className="rounded-2xl bg-ink p-6 text-white"><p className="text-xs font-semibold uppercase tracking-[.2em] text-acid">Контроль качества</p><div className="my-7 font-display text-6xl font-bold">{quality?.score ?? "—"}<span className="text-lg text-white/45"> / 100</span></div>
         {quality ? <div className="space-y-3">{[...quality.issues, ...quality.warnings, ...quality.suggestions].map((message, index) => <p key={index} className="rounded-lg border border-white/15 p-3 text-sm">{message}</p>)}<p className="text-sm text-white/60">{quality.words_count} слов</p></div> : <p className="text-sm text-white/60">Проверьте письмо, чтобы увидеть оценку и HTML-предпросмотр.</p>}

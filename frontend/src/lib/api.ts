@@ -22,7 +22,7 @@ export async function api<T>(path: string, options: ApiOptions = {}, retry = tru
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(workspaceId ? { "X-Workspace-ID": workspaceId } : {}),
       ...options.headers,

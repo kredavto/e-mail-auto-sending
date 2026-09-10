@@ -7,6 +7,7 @@ import bleach
 from bleach.css_sanitizer import CSSSanitizer
 from jinja2 import Environment, StrictUndefined, select_autoescape
 
+from app.config import get_settings
 from app.core.exceptions import AppError
 
 VARIABLE_RE = re.compile(r"{{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}")
@@ -169,6 +170,19 @@ class EditorService:
                 'style="display:inline-block;padding:13px 22px;color:#172016;'
                 f'text-decoration:none;font-weight:bold">{label}</a></td></tr></table>'
             )
+        if node_type == "emailImage":
+            source = str(attrs.get("src", ""))
+            prefix = get_settings().public_base_url.rstrip("/") + "/api/v1/files/images/"
+            if not source.startswith(prefix) or not re.fullmatch(
+                r"[a-f0-9]{32}\.png", source[len(prefix) :]
+            ):
+                raise AppError("Загрузите изображение через кнопку «+ Изображение».")
+            alt = html.escape(str(attrs.get("alt", ""))[:300], quote=True)
+            alt = alt.replace("{", "&#123;").replace("}", "&#125;")
+            return (
+                f'<img src="{html.escape(source, quote=True)}" alt="{alt}" width="144" '
+                'style="display:block;width:25%;max-width:144px;height:auto;margin:16px 0">'
+            )
         if node_type == "signatureBlock":
             return (
                 '<div style="margin-top:24px;border-top:1px solid #ddd;'
@@ -198,6 +212,8 @@ class EditorService:
             elif item.get("type") == "ctaButton":
                 attrs = item.get("attrs") or {}
                 chunks.append(f'{attrs.get("label", "Подробнее")}: {attrs.get("url", "")}')
+            elif item.get("type") == "emailImage":
+                chunks.append("[Изображение]\n")
             children = item.get("content")
             if isinstance(children, list):
                 chunks.append(self._text(children))
