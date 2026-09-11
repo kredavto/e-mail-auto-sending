@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import { stages, type MailTemplate } from "../lib/mailing";
+import { getLetterType, letterTypes, stages, type MailTemplate } from "../lib/mailing";
 
 export function TemplatesPanel({ workspaceId, onEdit }: { workspaceId: string; onEdit: (template: MailTemplate | null) => void }) {
   const [stage, setStage] = useState("");
@@ -27,6 +27,7 @@ export function TemplatesPanel({ workspaceId, onEdit }: { workspaceId: string; o
     {templates.isFetching && <p>Загрузка…</p>}
     {workspaceId && !templates.isFetching && !filtered.length && <p className="hint">Шаблонов не найдено. Нажмите «Новый шаблон», заполните письмо и сохраните.</p>}
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{filtered.map(item => <article key={item.id} className="rounded-xl border border-ink/15 p-5">
+      <p className="mb-3 text-sm font-semibold">{letterTypes[getLetterType(item.editor_state)]}</p>
       <span className="rounded-full bg-acid/40 px-3 py-1 text-xs font-semibold">{stages[item.category] ?? item.category}</span><h3 className="mb-2 mt-4 text-lg font-semibold">{item.name}</h3><p className="break-words text-sm">{item.subject_template}</p><p className="hint my-3">Версия {item.version} · {item.variables.length} переменных</p>
       <div className="flex flex-wrap gap-2"><button className="button primary" onClick={() => onEdit(item)}>Открыть в редакторе</button><button className="button" onClick={() => setDeleteId(item.id)}>Удалить</button></div>
       {deleteId === item.id && <div role="alert" className="mt-3 space-y-2"><p>Удалить «{item.name}»? Это действие нельзя отменить.</p><button className="button" disabled={busy} onClick={() => remove(item.id)}>Да, удалить</button> <button className="button" disabled={busy} onClick={() => setDeleteId("")}>Отмена</button></div>}

@@ -2,6 +2,30 @@ import type { JSONContent } from "@tiptap/core";
 
 export const stages = { first_contact: "Первое обращение", second: "Повторное обращение", warmup: "Прогрев", cta: "Предложение / CTA", reminder: "Напоминание" } as const;
 export type Stage = keyof typeof stages;
+export const letterTypes = { personalized: "Персонализированное", general: "Общее" } as const;
+export type LetterType = keyof typeof letterTypes;
+export function getLetterType(state?: JSONContent): LetterType {
+  return state?.attrs?.letterType === "general" ? "general" : "personalized";
+}
+export function withLetterType(state: JSONContent, letterType: LetterType): JSONContent {
+  return { ...state, attrs: { ...state.attrs, letterType } };
+}
+// General letters support only a shared product name, never recipient data or expressions.
+export function generalLetterIssue(state: JSONContent, subject: string): string {
+  const values: string[] = [subject];
+  function collect(node: JSONContent) {
+    if (node.text) values.push(node.text);
+    if (node.type === "variable") values.push(`{{${node.attrs?.name ?? ""}}}`);
+    else values.push(...Object.values(node.attrs ?? {}).filter((v): v is string => typeof v === "string"));
+    node.content?.forEach(collect);
+  }
+  collect(state);
+  const remaining = values.join("\n").replace(/{{\s*product_name\s*}}/g, "");
+  const variables = [...new Set(Array.from(remaining.matchAll(/{{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}/g), m => m[1]))];
+  return /{{|{%|{#/.test(remaining)
+    ? `Общее письмо не использует данные получателя. Замените ${variables.length ? variables.map(v => `{{${v}}}`).join(", ") : "персональные переменные и выражения"} обычным текстом в теме и письме или выберите «Персонализированное». Доступна только общая переменная {{product_name}}.`
+    : "";
+}
 export type MailTemplate = { id: string; name: string; category: Stage; subject_template: string; editor_state: JSONContent; version: number; variables: string[] };
 export type Contact = { id: string; email: string; full_name: string; first_name: string; last_name: string; patronymic: string | null; company: string; position: string; phone?: string; industry?: string; current_site_url?: string; company_size?: string; annual_revenue_tier?: string; status: string; custom_fields: Record<string, unknown> };
 export type ContactPage = { items: Contact[]; total: number; page: number; page_size: number };

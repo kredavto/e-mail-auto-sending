@@ -8,6 +8,7 @@ button { font: inherit; }
 .editor-content .tiptap { min-height: 430px; outline: none; }
 .editor-content .tiptap p { margin: 0 0 1rem; }
 .editor-content .tiptap h2 { font-family: Manrope, sans-serif; font-size: 1.6rem; line-height: 1.2; margin: 0 0 1rem; }
+.editor-content .tiptap .is-empty::before { content: attr(data-placeholder); color: #69736b; float: left; height: 0; pointer-events: none; }
 .editor-content .tiptap ul, .editor-content .tiptap ol { padding-left: 1.5rem; }
 .variable-chip { display: inline-flex; border-radius: 999px; background: #d8f04c; padding: 2px 8px; color: #142019; font-size: 13px; font-weight: 600; }
 

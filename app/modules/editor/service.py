@@ -65,6 +65,28 @@ CSS_SANITIZER = CSSSanitizer(
 
 
 class EditorService:
+    def letter_type(self, state: dict[str, object]) -> str:
+        attrs = state.get("attrs") or {}
+        if not isinstance(attrs, dict):
+            raise AppError("Некорректный тип письма")
+        kind = attrs.get("letterType", "personalized")
+        if kind not in ("personalized", "general"):
+            raise AppError("Выберите тип письма: «Персонализированное» или «Общее»")
+        return str(kind)
+
+    def validate_general(self, state: dict[str, object], *values: str) -> None:
+        if self.letter_type(state) != "general":
+            return
+        remaining = re.sub(r"{{\s*product_name\s*}}", "", "\n".join(values))
+        if any(marker in remaining for marker in ("{{", "{%", "{#")):
+            names = sorted(set(VARIABLE_RE.findall(remaining)))
+            detail = ", ".join("{{" + name + "}}" for name in names) or "переменные и выражения"
+            raise AppError(
+                f"Общее письмо: замените {detail} обычным текстом в теме и письме "
+                "или выберите «Персонализированное». Доступна только общая "
+                "переменная {{product_name}}; ФИО получателя не требуется."
+            )
+
     def compile(self, state: dict[str, object]) -> tuple[str, str, list[str], int, list[str]]:
         content = state.get("content", [])
         nodes = content if isinstance(content, list) else []
@@ -90,6 +112,7 @@ class EditorService:
             "</table><!--[if mso]></td></tr></table><![endif]--></td></tr></table>"
         )
         text = self._text(nodes).strip()
+        self.validate_general(state, body, text)
         variables = sorted(set(VARIABLE_RE.findall(f"{body} {text}")))
         warnings: list[str] = []
         score = 100

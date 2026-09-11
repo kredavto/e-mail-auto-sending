@@ -17,6 +17,7 @@ class TemplateService:
         self.editor = EditorService()
 
     def _compiled(self, state: dict[str, object], subject: str) -> tuple[str, str, list[str], int]:
+        self.editor.validate_general(state, subject)
         html, text, variables, score, _ = self.editor.compile(state)
         variables = sorted(set(variables) | set(VARIABLE_RE.findall(subject)))
         score = QualityChecker().check(html, text, subject).score
