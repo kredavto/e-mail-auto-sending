@@ -24,7 +24,9 @@ function blockNode(name: string, tag: string, className: string) {
   });
 }
 
-export const SignatureBlock = blockNode("signatureBlock", "section", "border-t border-stone-200 pt-4 mt-6 text-sm");
+export const SignatureBlock = blockNode("signatureBlock", "section", "border-t border-stone-200 pt-4 mt-6 text-sm").extend({
+  addAttributes: () => ({ signatureId: { default: null, parseHTML: element => element.getAttribute("data-signature-id"), renderHTML: attrs => attrs.signatureId ? { "data-signature-id": attrs.signatureId } : {} } }),
+});
 export const CaseStudyBlock = blockNode("caseStudyBlock", "aside", "border-l-4 border-acid bg-stone-50 p-4 my-5");
 export const UnsubscribeBlock = blockNode("unsubscribeBlock", "footer", "text-xs text-stone-500 mt-8");
 

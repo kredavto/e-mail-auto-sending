@@ -10,6 +10,7 @@ import { CaseStudyBlock, CTAButton, EmailImage, EmailVideo, SignatureBlock, Unsu
 import { ImageUpload } from "./ImageUpload";
 import { ctaDestination, moveCta } from "./cta-movement";
 import { EmailStylePanel } from "./EmailStylePanel";
+import { SignaturePanel } from "./SignaturePanel";
 import { emailFonts, getEmailStyle, readableText, withEmailStyle } from "../../lib/email-style";
 
 type CompileResult = { html: string; text: string; variables: string[]; quality_score: number; warnings: string[] };
@@ -135,6 +136,7 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
     {error && <p role="alert" className="error-box">{error}</p>}{notice && <p role="status" className="success-box">{notice}</p>}
     {typeIssue && <p role="alert" className="error-box">{typeIssue}</p>}
     <EmailStylePanel value={emailStyle} disabled={saving || uploading || showCta} onChange={next => { setEmailStyle(next); changed(); }} />
+    <SignaturePanel key={workspaceId} editor={editor} workspaceId={workspaceId} disabled={saving || uploading || showCta} onBusy={setUploading} />
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <section className="overflow-hidden rounded-2xl border border-ink/10 bg-white shadow-[0_18px_60px_rgba(20,32,25,.08)]">
         <div className="border-b border-ink/10 px-6 py-5"><label className="field">Тема письма<input value={subject} maxLength={255} disabled={saving} onChange={e => { setSubject(e.target.value); changed(); }} /></label></div>
