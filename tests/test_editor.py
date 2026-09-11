@@ -53,3 +53,30 @@ def test_compiler_strips_scripts() -> None:
     }
     html, *_ = EditorService().compile(state)
     assert "<script>" not in html
+
+
+def test_multiple_cta_preserve_independent_links_and_document_order() -> None:
+    state = {
+        "type": "doc",
+        "content": [
+            {
+                "type": "ctaButton",
+                "attrs": {"label": "Каталог", "url": "https://example.com/catalog?a=1&b=2"},
+            },
+            {"type": "paragraph", "content": [{"type": "text", "text": "Между кнопками"}]},
+            {
+                "type": "ctaButton",
+                "attrs": {"label": "Встреча", "url": "https://example.com/meeting"},
+            },
+        ],
+    }
+    compiled, text, *_ = EditorService().compile(state)
+    assert 'href="https://example.com/catalog?a=1&amp;b=2"' in compiled
+    assert 'href="https://example.com/meeting"' in compiled
+    assert compiled.index("Каталог") < compiled.index("Между кнопками") < compiled.index("Встреча")
+    assert "Каталог: https://example.com/catalog?a=1&b=2" in text
+    assert "Встреча: https://example.com/meeting" in text
+    assert "data-drag-handle" not in compiled
+    state["content"].reverse()
+    preview = EditorService().preview(state, {})
+    assert preview.index("Встреча") < preview.index("Между кнопками") < preview.index("Каталог")

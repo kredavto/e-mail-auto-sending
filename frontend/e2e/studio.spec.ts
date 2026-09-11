@@ -64,7 +64,7 @@ test("CSV → server import → stage template → personalized HTML and clickab
   await page.getByRole("button", { name: "+ CTA", exact: true }).click();
   await page.getByLabel("Текст кнопки", { exact: true }).fill("Обсудить проект");
   await page.getByLabel("Адрес ссылки", { exact: true }).fill("https://example.com/meeting");
-  await page.getByRole("button", { name: "Вставить / обновить CTA" }).click();
+  await page.getByRole("button", { name: "Вставить CTA" }).click();
   await expect(page.locator(".tiptap a[data-cta]")).toHaveAttribute("href", "https://example.com/meeting");
   await expect(page.locator(".tiptap a[data-cta]")).toHaveText("Обсудить проект");
   await page.getByRole("button", { name: "Проверить письмо", exact: true }).click();

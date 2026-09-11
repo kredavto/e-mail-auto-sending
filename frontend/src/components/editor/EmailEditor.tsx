@@ -1,12 +1,14 @@
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { closeHistory } from "@tiptap/pm/history";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { baseVariables, contactVariables, generalLetterIssue, getLetterType, initialDocument, interpolate, letterTypes, safeCtaUrl, stages, withLetterType, type Contact, type LetterType, type MailTemplate, type Stage } from "../../lib/mailing";
 import { CaseStudyBlock, CTAButton, EmailImage, EmailVideo, SignatureBlock, UnsubscribeBlock, Variable } from "./extensions";
 import { ImageUpload } from "./ImageUpload";
+import { ctaDestination, moveCta } from "./cta-movement";
 
 type CompileResult = { html: string; text: string; variables: string[]; quality_score: number; warnings: string[] };
 type QualityResult = { score: number; issues: string[]; warnings: string[]; suggestions: string[]; words_count: number };
@@ -33,6 +35,7 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
   const [ctaLabel, setCtaLabel] = useState("Обсудить задачу");
   const [ctaUrl, setCtaUrl] = useState("");
   const [ctaError, setCtaError] = useState("");
+  const [ctaTarget, setCtaTarget] = useState<{ from: number; to: number; edit: boolean } | null>(null);
   const [variableName, setVariableName] = useState(getLetterType(template?.editor_state) === "general" ? "product_name" : "first_name");
   const client = useQueryClient();
   const revision = useRef(0);
@@ -43,7 +46,7 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
     onUpdate: changed,
   });
   useEffect(() => { setPreview(""); setResult(null); setQuality(null); revision.current++; }, [contact]);
-  useEffect(() => { editor?.setEditable(!saving && !uploading, false); }, [editor, saving, uploading]);
+  useEffect(() => { editor?.setEditable(!saving && !uploading && !showCta, false); }, [editor, saving, uploading, showCta]);
   function switchLetterType(next: LetterType) {
     if (!editor || next === letterType) return;
     // Only replace untouched starter content; never remove the user's letter or media.
@@ -77,7 +80,7 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
     finally { setChecking(false); }
   }
   async function save(copy = false) {
-    if (!editor || !workspaceId || uploading) return;
+    if (!editor || !workspaceId || uploading || showCta) return;
     if (letterType === "general" && generalLetterIssue(editor.getJSON(), subject)) return;
     if (!name.trim() || !subject.trim()) { setError("Заполните название шаблона и тему письма."); return; }
     setSaving(true); setError(""); setNotice("");
@@ -90,15 +93,20 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
   }
   function insertCta(event: React.FormEvent) {
     event.preventDefault();
+    if (!editor || !ctaTarget || saving || uploading) return;
     const url = safeCtaUrl(ctaUrl);
     if (!url || !ctaLabel.trim()) { setCtaError("Укажите текст и полный адрес ссылки с https:// или http://."); return; }
     const attrs = { label: ctaLabel.trim(), url };
-    if (editor?.isActive("ctaButton")) editor.chain().focus().updateAttributes("ctaButton", attrs).run();
-    else editor?.chain().focus().insertContent({ type: "ctaButton", attrs }).run();
+    if (ctaTarget.edit && editor.state.doc.nodeAt(ctaTarget.from)?.type.name !== "ctaButton") { setCtaError("Кнопка изменилась. Закройте форму и выберите её снова."); return; }
+    editor.chain().command(({ tr }) => { closeHistory(tr); return true; }).insertContentAt({ from: ctaTarget.from, to: ctaTarget.to }, { type: "ctaButton", attrs }).run();
     setShowCta(false); setCtaError("");
   }
-  function openCta() {
-    if (editor?.isActive("ctaButton")) { const attrs = editor.getAttributes("ctaButton"); setCtaLabel(attrs.label); setCtaUrl(attrs.url); }
+  function openCta(edit = false) {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    setCtaTarget({ from: edit ? from : to, to, edit });
+    if (edit) { const attrs = editor.getAttributes("ctaButton"); setCtaLabel(attrs.label); setCtaUrl(attrs.url); }
+    else { setCtaLabel("Обсудить задачу"); setCtaUrl(""); }
     setShowCta(true); setCtaError("");
   }
   function downloadHtml() {
@@ -110,15 +118,15 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
   const typeIssue = letterType === "general" ? generalLetterIssue(editor.getJSON(), subject) : "";
   return <div className="space-y-5">
     <section className="panel flex flex-wrap items-end gap-3">
-      <fieldset disabled={saving || uploading} className="w-full space-y-2" aria-describedby="letter-type-help">
+      <fieldset disabled={saving || uploading || showCta} className="w-full space-y-2" aria-describedby="letter-type-help">
         <legend className="mb-2 font-semibold">Тип письма</legend>
         <div className="flex flex-wrap gap-2">{Object.entries(letterTypes).map(([value, label]) => <button key={value} type="button" className={`button ${letterType === value ? "primary" : ""}`} aria-pressed={letterType === value} onClick={() => switchLetterType(value as LetterType)}>{label}</button>)}</div>
         <p id="letter-type-help" className="hint">{letterType === "general" ? "Одинаковый текст для всех: начните с заголовка по тематике письма, без приветствия и ФИО. Подходит для корпоративной почты, когда получатель неизвестен. Для контакта достаточно email." : "Индивидуальное обращение: подставьте имя, компанию и другие известные данные из базы контактов."}</p>
       </fieldset>
       <label className="field grow">Название шаблона<input value={name} maxLength={200} onChange={e => { setName(e.target.value); changed(); }} placeholder="Например: первое предложение директору" disabled={saving} /></label>
       <label className="field">Стадия применения<select value={stage} disabled={saving} onChange={e => { setStage(e.target.value as Stage); changed(); }}>{Object.entries(stages).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-      <button className="button primary" onClick={() => save()} disabled={!workspaceId || saving || uploading || !!typeIssue}>{saving ? "Сохраняем…" : "Сохранить шаблон"}</button>
-      {template && <button className="button" onClick={() => save(true)} disabled={!workspaceId || saving || uploading || !!typeIssue}>Сохранить копию</button>}
+      <button className="button primary" onClick={() => save()} disabled={!workspaceId || saving || uploading || showCta || !!typeIssue}>{saving ? "Сохраняем…" : "Сохранить шаблон"}</button>
+      {template && <button className="button" onClick={() => save(true)} disabled={!workspaceId || saving || uploading || showCta || !!typeIssue}>Сохранить копию</button>}
       <p className="hint w-full">{template ? `Версия ${template.version}. ` : "Новый шаблон. "}Сохраняйте изменения кнопкой выше.{!workspaceId && " Для сохранения войдите в рабочее пространство."}</p>
     </section>
     {error && <p role="alert" className="error-box">{error}</p>}{notice && <p role="status" className="success-box">{notice}</p>}
@@ -126,7 +134,7 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <section className="overflow-hidden rounded-2xl border border-ink/10 bg-white shadow-[0_18px_60px_rgba(20,32,25,.08)]">
         <div className="border-b border-ink/10 px-6 py-5"><label className="field">Тема письма<input value={subject} maxLength={255} disabled={saving} onChange={e => { setSubject(e.target.value); changed(); }} /></label></div>
-        <fieldset disabled={saving || uploading} className="flex flex-wrap items-center gap-2 border-b border-ink/10 bg-paper/60 px-5 py-3">
+        <fieldset disabled={saving || uploading || showCta} className="min-w-0 flex flex-wrap items-center gap-2 border-b border-ink/10 bg-paper/60 px-5 py-3">
           <button onClick={() => editor.chain().focus().toggleBold().run()} className="button" aria-pressed={editor.isActive("bold")}>Жирный</button>
           <button onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className="button" aria-pressed={editor.isActive("heading", { level: 2 })}>Заголовок</button>
           <button onClick={() => editor.chain().focus().toggleBulletList().run()} className="button">Список</button>
@@ -134,15 +142,25 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
           <button className="button" disabled={!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(variableName) || (letterType === "general" && variableName !== "product_name")} onClick={() => editor.chain().focus().insertContent({ type: "variable", attrs: { name: variableName } }).run()}>+ Переменная</button>
           <button onClick={() => { setShowImage(false); openCta(); }} className="button primary">+ CTA</button>
           <button onClick={() => { setShowCta(false); setShowImage(!showImage); }} className="button">+ Фото / видео</button>
+          <button className="button" disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>Отменить действие</button>
+          <button className="button" disabled={!editor.can().redo()} onClick={() => editor.chain().focus().redo().run()}>Повторить действие</button>
+          {editor.isActive("ctaButton") && <div className="flex w-full flex-wrap items-center gap-2" role="group" aria-label="Выбранная кнопка">
+            <span className="w-full break-words text-sm">Выбрана: {editor.getAttributes("ctaButton").label}</span>
+            <button type="button" className="button" onClick={() => { setShowImage(false); openCta(true); }}>Изменить кнопку</button>
+            <button type="button" className="button" disabled={ctaDestination(editor, -1) === null} onClick={() => moveCta(editor, -1)}>↑ Выше</button>
+            <button type="button" className="button" disabled={ctaDestination(editor, 1) === null} onClick={() => moveCta(editor, 1)}>↓ Ниже</button>
+            <button type="button" className="button" onClick={() => editor.chain().focus().command(({ tr }) => { closeHistory(tr); return true; }).deleteSelection().run()}>Удалить кнопку</button>
+          </div>}
         </fieldset>
         {showImage && <ImageUpload editor={editor} workspaceId={workspaceId} onBusy={setUploading} onClose={() => setShowImage(false)} />}
         {showCta && <form onSubmit={insertCta} className="space-y-3 border-b border-ink/10 bg-acid/10 p-5">
           <p className="font-semibold">Кликабельная кнопка: адрес скрыт за текстом</p><label className="field">Текст кнопки<input value={ctaLabel} onChange={e => setCtaLabel(e.target.value)} required maxLength={200} /></label><label className="field">Адрес ссылки<input type="url" value={ctaUrl} onChange={e => setCtaUrl(e.target.value)} placeholder="https://ваш-сайт.ru/встреча" required /></label>
-          {ctaError && <p role="alert" className="error-box">{ctaError}</p>}<button className="button primary">Вставить / обновить CTA</button> <button type="button" className="button" onClick={() => setShowCta(false)}>Отмена</button>
+          <p className="hint">{ctaTarget?.edit ? "Изменяется только выбранная кнопка." : "Добавляется новая кнопка в позицию курсора или после выделенной кнопки. У каждой кнопки своя ссылка."}</p>
+          {ctaError && <p role="alert" className="error-box">{ctaError}</p>}<button className="button primary" disabled={saving || uploading}>{ctaTarget?.edit ? "Сохранить изменения кнопки" : "Вставить CTA"}</button> <button type="button" className="button" onClick={() => setShowCta(false)}>Отмена</button>
         </form>}
         <EditorContent editor={editor} className="editor-content px-7 py-7" />
         <div className="px-7 pb-6"><a href={`${import.meta.env.VITE_API_URL ?? "/api/v1"}/unsubscribe/preview`} target="_blank" rel="noopener noreferrer" className="text-xs text-stone-500 underline">Отписаться от рассылки</a><p className="hint mt-2">Добавляется автоматически в конец каждого письма. Персональная ссылка создаётся при отправке; здесь — безопасный предпросмотр.</p></div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 px-6 py-4"><span className="hint">Переход по CTA доступен в предпросмотре ниже.</span><button onClick={compile} disabled={checking || saving || uploading || !!typeIssue} className="button primary">{checking ? "Проверяем…" : "Проверить письмо"}</button></div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 px-6 py-4"><span className="hint">Добавляйте сколько нужно CTA с разными ссылками. Перетаскивайте за ⠿ в нужное место текста. Или нажмите на кнопку в письме и используйте «Выше / Ниже» на панели. Переход по ссылкам — в предпросмотре.</span><button onClick={compile} disabled={checking || saving || uploading || showCta || !!typeIssue} className="button primary">{checking ? "Проверяем…" : "Проверить письмо"}</button></div>
       </section>
       <aside className="rounded-2xl bg-ink p-6 text-white"><p className="text-xs font-semibold uppercase tracking-[.2em] text-acid">Контроль качества</p><div className="my-7 font-display text-6xl font-bold">{quality?.score ?? "—"}<span className="text-lg text-white/45"> / 100</span></div>
         {quality ? <div className="space-y-3">{[...quality.issues, ...quality.warnings, ...quality.suggestions].map((message, index) => <p key={index} className="rounded-lg border border-white/15 p-3 text-sm">{message}</p>)}<p className="text-sm text-white/60">{quality.words_count} слов</p></div> : <p className="text-sm text-white/60">Проверьте письмо, чтобы увидеть оценку и HTML-предпросмотр.</p>}

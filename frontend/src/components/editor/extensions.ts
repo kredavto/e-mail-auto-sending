@@ -1,4 +1,6 @@
 import { Node, mergeAttributes } from "@tiptap/core";
+import { ReactNodeViewRenderer } from "@tiptap/react";
+import { CtaButtonView } from "./CtaButtonView";
 import { safeCtaUrl } from "../../lib/mailing";
 
 export const Variable = Node.create({
@@ -30,6 +32,8 @@ export const CTAButton = Node.create({
   name: "ctaButton",
   group: "block",
   atom: true,
+  draggable: true,
+  addNodeView: () => ReactNodeViewRenderer(CtaButtonView),
   addAttributes: () => ({ label: { default: "Подробнее", parseHTML: element => element.textContent, rendered: false }, url: { default: "", parseHTML: element => element.getAttribute("href"), rendered: false } }),
   parseHTML: () => [{ tag: "a[data-cta]" }],
   renderHTML: ({ node, HTMLAttributes }) => ["a", mergeAttributes(HTMLAttributes, { "data-cta": "true", href: safeCtaUrl(node.attrs.url) ?? undefined, target: "_blank", rel: "noopener noreferrer", class: "inline-block rounded-md bg-acid px-5 py-3 font-semibold no-underline my-4" }), node.attrs.label],

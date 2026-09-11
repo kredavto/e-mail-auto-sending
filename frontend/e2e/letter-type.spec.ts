@@ -60,7 +60,7 @@ test("general letter: thematic heading, no name, save/reopen/copy, safe switchin
   await page.getByRole("button", { name: "+ CTA", exact: true }).click();
   await page.getByLabel("Текст кнопки", { exact: true }).fill("Подробнее");
   await page.getByLabel("Адрес ссылки", { exact: true }).fill("https://example.com/demo");
-  await page.getByRole("button", { name: "Вставить / обновить CTA" }).click();
+  await page.getByRole("button", { name: "Вставить CTA" }).click();
   await page.getByRole("button", { name: "Проверить письмо", exact: true }).click();
   await expect(page.frameLocator("iframe").getByText("Автоматизация учёта")).toBeVisible();
   await page.getByRole("button", { name: "Сохранить шаблон", exact: true }).click();
