@@ -35,6 +35,18 @@ export function parseCsv(text: string): string[][] {
   return result.data.map(row => row.map(cellText));
 }
 export type ImportedContact = { email: string; full_name: string; company: string; position: string; source: string; tags: string[]; custom_fields: Record<string, string>; [key: string]: unknown };
+export const MAX_IMPORT_CONTACTS = 5000;
+export function splitEmailCell(value: string): string[] {
+  return value.split(/[,;\s]+/u).map(email => email.trim().toLowerCase()).filter(Boolean);
+}
+function validEmail(email: string): boolean {
+  const parts = email.split("@");
+  if (parts.length !== 2 || email.length > 254) return false;
+  const [local, domain] = parts;
+  return !!local && local.length <= 64 && !local.startsWith(".") && !local.endsWith(".") && !local.includes("..")
+    && /^[\p{L}\p{N}.!#$%&'*+/=?^_`{|}~-]+$/u.test(local)
+    && domain.includes(".") && domain.split(".").every(label => label.length <= 63 && /^[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?$/u.test(label));
+}
 export function prepareContacts(rows: string[][], mapping: string[], filename: string, firstDataRow: number) {
   const targets = mapping.filter(Boolean);
   if (!targets.includes("email")) throw new Error("Укажите колонку с email.");
@@ -47,6 +59,7 @@ export function prepareContacts(rows: string[][], mapping: string[], filename: s
   const contacts: ImportedContact[] = [];
   const errors: string[] = [];
   let duplicates = 0;
+  let expandedRows = 0;
   rows.forEach((row, index) => {
     if (!row.some(value => value.trim())) return;
     const values: Record<string, string> = {};
@@ -55,16 +68,22 @@ export function prepareContacts(rows: string[][], mapping: string[], filename: s
       if (field.startsWith("custom:")) custom[field.slice(7)] = cellText(row[column]);
       else if (field) values[field] = cellText(row[column]);
     });
-    const email = (values.email ?? "").toLowerCase();
-    if (!/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(email) || email.length > 254) { errors.push(`Строка ${firstDataRow + index}: отсутствует или некорректен email (один адрес на строку).`); return; }
-    if (seen.has(email)) { duplicates++; return; }
-    seen.add(email);
+    const emails = splitEmailCell(values.email ?? "");
+    if (!emails.length) { errors.push(`Строка ${firstDataRow + index}: отсутствует email.`); return; }
+    if (emails.length > 1) expandedRows++;
     const { first_name, last_name, patronymic, tags, ...rest } = values;
     const fullName = values.full_name || [last_name, first_name, patronymic].filter(Boolean).join(" ");
     const limits: Record<string, number> = { full_name: 255, first_name: 100, last_name: 100, patronymic: 100, company: 255, position: 100, phone: 50, current_site_url: 255, industry: 100, company_size: 50, annual_revenue_tier: 50 };
     const longField = Object.keys(limits).find(key => (key === "full_name" ? fullName : values[key] ?? "").length > limits[key]);
-    if (longField) { seen.delete(email); errors.push(`Строка ${firstDataRow + index}: поле «${importFields[longField]}» длиннее ${limits[longField]} символов.`); return; }
-    contacts.push({ ...rest, ...(first_name ? { first_name } : {}), ...(last_name ? { last_name } : {}), ...(patronymic ? { patronymic } : {}), email, full_name: fullName, company: values.company || "", position: values.position || "", source: `import:${filename}`.slice(0, 50), tags: tags ? tags.split(/[,;]/).map(x => x.trim()).filter(Boolean) : [], custom_fields: custom });
+    if (longField) { errors.push(`Строка ${firstDataRow + index}: поле «${importFields[longField]}» длиннее ${limits[longField]} символов.`); return; }
+    const invalid = emails.filter(email => !validEmail(email));
+    if (invalid.length) errors.push(`Строка ${firstDataRow + index}: некорректные email пропущены: ${invalid.join(", ")}. Корректные адреса этой строки будут импортированы.`);
+    for (const email of emails.filter(validEmail)) {
+      if (seen.has(email)) { duplicates++; continue; }
+      if (contacts.length >= MAX_IMPORT_CONTACTS) throw new Error(`После разделения email получилось больше ${MAX_IMPORT_CONTACTS} контактов. Разделите файл; адреса не были обрезаны или отправлены на сервер.`);
+      seen.add(email);
+      contacts.push({ ...rest, ...(first_name ? { first_name } : {}), ...(last_name ? { last_name } : {}), ...(patronymic ? { patronymic } : {}), email, full_name: fullName, company: values.company || "", position: values.position || "", source: `import:${filename}`.slice(0, 50), tags: tags ? tags.split(/[,;]/).map(x => x.trim()).filter(Boolean) : [], custom_fields: { ...custom } });
+    }
   });
-  return { contacts, errors, duplicates };
+  return { contacts, errors, duplicates, expandedRows };
 }

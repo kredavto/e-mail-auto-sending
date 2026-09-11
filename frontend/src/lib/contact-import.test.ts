@@ -1,8 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { guessMapping, parseCsv, prepareContacts } from "./contact-import";
+import { guessMapping, MAX_IMPORT_CONTACTS, parseCsv, prepareContacts, splitEmailCell } from "./contact-import";
 import { contactVariables, safeCtaUrl, type Contact } from "./mailing";
 
 describe("contact import", () => {
+  it.each([",", ";", " ", "\n", "\r\n", "\t", "\u00a0"])("splits multiple addresses separated by %j", separator => {
+    const result = prepareContacts([[`INFO@example.com${separator}sales@example.com${separator}office@example.com`, "Иванов Иван", "Компания", "Москва", "vip;crm"]], ["email", "full_name", "company", "custom:city", "tags"], "база.xlsx", 2);
+    expect(result.contacts.map(c => c.email)).toEqual(["info@example.com", "sales@example.com", "office@example.com"]);
+    expect(result.errors).toEqual([]);
+    expect(result.expandedRows).toBe(1);
+    for (const contact of result.contacts) expect(contact).toMatchObject({ full_name: "Иванов Иван", company: "Компания", custom_fields: { city: "Москва" }, tags: ["vip", "crm"] });
+  });
+  it("skips duplicates within and across cells and keeps good addresses beside invalid ones", () => {
+    const result = prepareContacts([["a@example.com;bad;A@example.com;b@example.com", "Первая"], ["B@example.com, c@example.com", "Вторая"]], ["email", "company"], "", 2);
+    expect(result.contacts.map(c => c.email)).toEqual(["a@example.com", "b@example.com", "c@example.com"]);
+    expect(result.contacts.map(c => c.company)).toEqual(["Первая", "Первая", "Вторая"]);
+    expect(result.duplicates).toBe(2);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain("Строка 2");
+    expect(splitEmailCell(" ; , \n")).toEqual([]);
+    expect(splitEmailCell("a+b@example.com;name/department@example.com")).toEqual(["a+b@example.com", "name/department@example.com"]);
+  });
+  it("reads quoted multi-address CSV cells without shifting other columns", () => {
+    const rows = parseCsv('Email,Компания\r\n"a@example.com,b@example.com;\nc@example.com",Тест');
+    const result = prepareContacts(rows.slice(1), guessMapping(rows[0]), "база.csv", 2);
+    expect(result.contacts).toHaveLength(3);
+    expect(result.contacts.every(c => c.company === "Тест")).toBe(true);
+  });
+  it("enforces the contact limit after expansion without silently truncating", () => {
+    const emails = Array.from({ length: MAX_IMPORT_CONTACTS }, (_, i) => `c${i}@example.com`);
+    expect(prepareContacts([[emails.join(";")]], ["email"], "", 2).contacts).toHaveLength(5000);
+    expect(() => prepareContacts([[`${emails.join(";")};extra@example.com`]], ["email"], "", 2)).toThrow("5000");
+  });
+  it("rejects invalid individual addresses but preserves Unicode domains", () => {
+    const result = prepareContacts([["a..b@example.com;.name@example.com;a@-example.com;info@пример.рф"]], ["email"], "", 2);
+    expect(result.contacts.map(c => c.email)).toEqual(["info@пример.рф"]);
+    expect(result.errors).toHaveLength(1);
+  });
   it("reads Excel CSV with BOM, sep, quotes, semicolon and multiline cells", () => {
     const rows = parseCsv('\uFEFFsep=;\r\nEmail;Ф.И.О.;Компания\r\na@example.com;Иванов Иван;"ООО ""Тест"";\nМосква"\r\n');
     expect(rows[1]).toEqual(["a@example.com", "Иванов Иван", 'ООО "Тест";\nМосква']);

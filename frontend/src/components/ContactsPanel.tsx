@@ -23,7 +23,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
   const headers = rows[headerRow - 1] ?? [];
   const prepared = useMemo(() => {
     try { return { ...prepareContacts(rows.slice(headerRow), mapping, file?.name ?? "", headerRow + 1), problem: "" }; }
-    catch (reason) { return { contacts: [], errors: [], duplicates: 0, problem: reason instanceof Error ? reason.message : "Проверьте поля" }; }
+    catch (reason) { return { contacts: [], errors: [], duplicates: 0, expandedRows: 0, problem: reason instanceof Error ? reason.message : "Проверьте поля" }; }
   }, [rows, headerRow, mapping, file]);
   async function loadFile(nextFile: File, nextSheet = "", nextEncoding = encoding) {
     const ticket = ++request.current;
@@ -57,6 +57,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
     finally { if (ticket === request.current) setBusy(false); }
   }
   async function importContacts() {
+    if (busy || !workspaceId || prepared.problem || !prepared.contacts.length || result) return;
     setBusy(true); setError(""); setResult(null);
     try {
       const report = await api<ImportResult>("/contacts/bulk", { workspaceId, method: "POST", body: JSON.stringify({ contacts: prepared.contacts }) });
@@ -67,7 +68,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
   }
   return <div className="space-y-5">
     <section className="panel space-y-4"><h2 className="font-display text-2xl font-bold">Загрузить базу контактов</h2>
-      <p className="hint">Excel .xlsx или CSV · до 10 МБ / 5000 контактов · один email на строку. Файл разбирается в браузере, выбранные поля сохраняются на сервере после подтверждения. Также действуют лимиты вашего тарифа.</p>
+      <p className="hint">Excel .xlsx или CSV · до 10 МБ / 5000 контактов после разделения email. В одной ячейке можно указать несколько адресов через запятую, точку с запятой, пробел или перенос строки. Каждый email станет отдельным контактом с данными исходной строки. Файл разбирается в браузере; сохранение — после подтверждения. Также действуют лимиты вашего тарифа.</p>
       <label className="field">Файл контактов<input type="file" accept=".xlsx,.csv" disabled={busy} onChange={e => { const selected = e.target.files?.[0]; if (selected) void loadFile(selected); }} /></label>
       {error && <p role="alert" className="error-box">{error}</p>}
       {busy && <p role="status">Обрабатываем…</p>}
@@ -85,6 +86,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
         </tr>)}</tbody></table></div>
         {prepared.problem && <p className="error-box">{prepared.problem}</p>}
         <p>Готово к импорту: <strong>{prepared.contacts.length}</strong> · Дубли в файле: {prepared.duplicates} · Строки с ошибками: {prepared.errors.length}</p>
+        {!!prepared.expandedRows && <p className="hint">Строк с несколькими email: {prepared.expandedRows}. Каждый уникальный корректный адрес показан отдельным контактом; остальные данные строки сохранены. Для дублей используются данные первого корректного вхождения.</p>}
         {!!prepared.errors.length && <details><summary>Показать ошибки строк</summary><ul className="max-h-48 overflow-auto text-sm">{prepared.errors.map(message => <li key={message}>{message}</li>)}</ul></details>}
         {!!prepared.contacts.length && <div className="overflow-x-auto"><table className="data-table"><caption className="mb-2 text-left font-semibold">Предпросмотр — первые 5 контактов</caption><thead><tr><th>Email</th><th>Ф.И.О.</th><th>Организация</th><th>Должность</th><th>Доп. поля</th></tr></thead><tbody>{prepared.contacts.slice(0, 5).map(contact => <tr key={contact.email}><td>{contact.email}</td><td>{contact.full_name}</td><td>{contact.company}</td><td>{contact.position}</td><td>{Object.entries(contact.custom_fields).map(([key, value]) => `${key}: ${value}`).join(" · ")}</td></tr>)}</tbody></table></div>}
         <button className="button primary" onClick={importContacts} disabled={busy || !workspaceId || !prepared.contacts.length || !!prepared.problem || !!result}>Импортировать {prepared.contacts.length} контактов</button>

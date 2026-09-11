@@ -9,6 +9,7 @@ from app.core.pagination import Page, PageParams
 from app.database import get_db
 from app.modules.audit.service import AuditService
 from app.modules.billing.service import BillingService
+from app.modules.contacts.importing import prepare_import_rows
 from app.modules.contacts.repository import ContactRepository
 from app.modules.contacts.schemas import (
     BulkContactsCreate,
@@ -127,18 +128,7 @@ async def import_contacts(
     if len(content) > 25 * 1024 * 1024:
         raise ValueError("Максимальный размер файла 25 MB")
     _, rows = FileService.parse_content(file.filename or "contacts.csv", content)
-    allowed = set(ContactCreate.model_fields)
-    contacts: list[ContactCreate] = []
-    errors: list[str] = []
-    for index, row in enumerate(rows, start=2):
-        try:
-            contacts.append(
-                ContactCreate.model_validate(
-                    {key: value for key, value in row.items() if key in allowed}
-                )
-            )
-        except ValueError as exc:
-            errors.append(f"Строка {index}: {exc}")
+    contacts, errors = prepare_import_rows(rows)
     if contacts:
         await BillingService(db, tenant.workspace_id).check_limits("create_contact", len(contacts))
     result = await ContactService(db, tenant.workspace_id).bulk(contacts)
