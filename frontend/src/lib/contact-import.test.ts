@@ -77,9 +77,18 @@ describe("contact import", () => {
     expect(() => prepareContacts([], ["email", "custom:email"], "", 2)).toThrow("встроенной");
     expect(() => prepareContacts([], ["email", "custom:город"], "", 2)).toThrow("латинские");
   });
-  it("reports oversized fields before sending a batch", () => {
+  it("keeps contacts with oversized fields and preserves originals", () => {
     const result = prepareContacts([["a@example.com", "x".repeat(260)]], ["email", "company"], "", 2);
-    expect(result.contacts).toHaveLength(0); expect(result.errors[0]).toContain("255");
+    expect(result.contacts).toHaveLength(1); expect(result.errors).toEqual([]);
+    expect(result.contacts[0].company).toHaveLength(255);
+    expect(result.contacts[0].custom_fields.import_original_company).toBe("x".repeat(260));
+    expect(result.warnings[0]).toContain("255");
+  });
+  it("imports long industry, phone and names; preserves custom collisions and skips only unusable emails", () => {
+    const industry = "Отрасль ".repeat(50).trim(), phone = "+7 900 123-45-67; ".repeat(12).trim();
+    const result = prepareContacts([["a@example.com;b@example.com", industry, phone, "Я".repeat(150), "existing"], ["", industry, phone, "", ""], ["bad", "", "", "", ""]], ["email", "industry", "phone", "first_name", "custom:import_original_industry"], "test.csv", 2);
+    expect(result.contacts).toHaveLength(2); expect(result.errors).toHaveLength(2);
+    expect(result.contacts[0]).toMatchObject({ industry: industry.slice(0, 100), phone: phone.slice(0, 50), first_name: "Я".repeat(100), custom_fields: { import_original_industry: "existing", import_original_industry_2: industry, import_original_phone: phone, import_original_first_name: "Я".repeat(150) } });
   });
   it("rejects malformed CSV and accepts comma and tab delimiters", () => {
     expect(() => parseCsv('email,name\na@example.com,"unclosed')).toThrow("Ошибка CSV");

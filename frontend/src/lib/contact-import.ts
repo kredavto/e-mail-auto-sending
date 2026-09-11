@@ -88,6 +88,7 @@ export function prepareContacts(rows: string[][], mapping: string[], filename: s
   const seen = new Set<string>();
   const contacts: ImportedContact[] = [];
   const errors: string[] = [];
+  const warnings: string[] = [];
   let duplicates = 0;
   let expandedRows = 0;
   rows.forEach((row, index) => {
@@ -101,11 +102,21 @@ export function prepareContacts(rows: string[][], mapping: string[], filename: s
     const emails = splitEmailCell(values.email ?? "");
     if (!emails.length) { errors.push(`Строка ${firstDataRow + index}: отсутствует email.`); return; }
     if (emails.length > 1) expandedRows++;
-    const { first_name, last_name, patronymic, tags, ...rest } = values;
-    const fullName = values.full_name || [last_name, first_name, patronymic].filter(Boolean).join(" ");
+    values.full_name ||= [values.last_name, values.first_name, values.patronymic].filter(Boolean).join(" ");
     const limits: Record<string, number> = { full_name: 255, first_name: 100, last_name: 100, patronymic: 100, company: 255, position: 100, phone: 50, current_site_url: 255, industry: 100, company_size: 50, annual_revenue_tier: 50 };
-    const longField = Object.keys(limits).find(key => (key === "full_name" ? fullName : values[key] ?? "").length > limits[key]);
-    if (longField) { errors.push(`Строка ${firstDataRow + index}: поле «${importFields[longField]}» длиннее ${limits[longField]} символов.`); return; }
+    for (const [field, limit] of Object.entries(limits)) {
+      const value = values[field] ?? "";
+      const characters = Array.from(value);
+      if (characters.length <= limit) continue;
+      const base = `import_original_${field}`;
+      let key = base, suffix = 2;
+      while (Object.prototype.hasOwnProperty.call(custom, key) && custom[key] !== value) key = `${base}_${suffix++}`;
+      custom[key] = value;
+      values[field] = characters.slice(0, limit).join("");
+      warnings.push(`Строка ${firstDataRow + index}: поле «${importFields[field]}» сокращено до ${limit} символов; полный текст сохранён в дополнительном поле ${key}. Контакт будет импортирован при корректном email.`);
+    }
+    const { first_name, last_name, patronymic, tags, ...rest } = values;
+    const fullName = values.full_name;
     const invalid = emails.filter(email => !validEmail(email));
     if (invalid.length) errors.push(`Строка ${firstDataRow + index}: некорректные email пропущены: ${invalid.join(", ")}. Корректные адреса этой строки будут импортированы.`);
     for (const email of emails.filter(validEmail)) {
@@ -115,5 +126,5 @@ export function prepareContacts(rows: string[][], mapping: string[], filename: s
       contacts.push({ ...rest, ...(first_name ? { first_name } : {}), ...(last_name ? { last_name } : {}), ...(patronymic ? { patronymic } : {}), email, full_name: fullName, company: values.company || "", position: values.position || "", source: `import:${filename}`.slice(0, 50), tags: tags ? tags.split(/[,;]/).map(x => x.trim()).filter(Boolean) : [], custom_fields: { ...custom } });
     }
   });
-  return { contacts, errors, duplicates, expandedRows };
+  return { contacts, errors, warnings, duplicates, expandedRows };
 }

@@ -1,7 +1,9 @@
+from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
+from app.modules.contacts.normalization import normalize_contact_text
 from app.shared.dto import ORMModel
 
 MAX_IMPORT_CONTACTS = 70000
@@ -25,6 +27,11 @@ class ContactBase(BaseModel):
 
 
 class ContactCreate(ContactBase):
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_optional_text(cls, data: Any) -> Any:
+        return normalize_contact_text(data) if isinstance(data, dict) else data
+
     # Preserve explicit spreadsheet name parts instead of guessing their order.
     first_name: str | None = Field(default=None, max_length=100)
     last_name: str | None = Field(default=None, max_length=100)

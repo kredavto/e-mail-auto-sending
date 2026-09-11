@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ConflictError, NotFoundError
 from app.modules.audit import audited
 from app.modules.contacts.models import Contact, Segment
+from app.modules.contacts.normalization import normalize_contact_text
 from app.modules.contacts.repository import ContactRepository
 from app.modules.contacts.schemas import BulkResult, ContactCreate, ContactUpdate, SegmentCreate
 from app.shared.utils import normalize_email, parse_full_name
@@ -27,12 +28,16 @@ class ContactService:
         patronymic = data.patronymic if data.patronymic is not None else patronymic
         return await self.repo.add(
             Contact(
-                workspace_id=self.workspace_id,
-                email=email,
-                last_name=last_name,
-                first_name=first_name,
-                patronymic=patronymic,
-                **data.model_dump(exclude={"email", "first_name", "last_name", "patronymic"}),
+                **normalize_contact_text(
+                    {
+                        **data.model_dump(),
+                        "workspace_id": self.workspace_id,
+                        "email": email,
+                        "last_name": last_name,
+                        "first_name": first_name,
+                        "patronymic": patronymic,
+                    }
+                ),
             )
         )
 
