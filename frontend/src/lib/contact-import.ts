@@ -1,5 +1,11 @@
 import Papa from "papaparse";
 
+export const MAX_IMPORT_FILE_MB = 50;
+export const MAX_IMPORT_FILE_BYTES = MAX_IMPORT_FILE_MB * 1024 * 1024;
+export function validateContactFileSize(size: number): void {
+  if (size > MAX_IMPORT_FILE_BYTES) throw new Error(`Файл больше ${MAX_IMPORT_FILE_MB} МБ. Разделите базу на несколько файлов.`);
+}
+
 export const importFields: Record<string, string> = {
   email: "Email (обязательно)", full_name: "Ф.И.О. руководителя", last_name: "Фамилия", first_name: "Имя", patronymic: "Отчество",
   company: "Организация", position: "Должность", phone: "Телефон", industry: "Отрасль", current_site_url: "Сайт",

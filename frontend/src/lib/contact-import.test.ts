@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { guessMapping, MAX_IMPORT_CONTACTS, parseCsv, prepareContacts, splitEmailCell } from "./contact-import";
+import { guessMapping, MAX_IMPORT_CONTACTS, MAX_IMPORT_FILE_BYTES, parseCsv, prepareContacts, splitEmailCell, validateContactFileSize } from "./contact-import";
 import { contactVariables, safeCtaUrl, type Contact } from "./mailing";
 
 describe("contact import", () => {
+  it.each([10 * 1024 * 1024 + 1, 50 * 1024 * 1024 - 1, 50 * 1024 * 1024])("accepts file size %i up to 50 MiB inclusive", size => {
+    expect(MAX_IMPORT_FILE_BYTES).toBe(50 * 1024 * 1024);
+    expect(() => validateContactFileSize(size)).not.toThrow();
+  });
+  it("rejects files above 50 MiB", () => {
+    expect(() => validateContactFileSize(50 * 1024 * 1024 + 1)).toThrow("Файл больше 50 МБ");
+  });
   it.each([",", ";", " ", "\n", "\r\n", "\t", "\u00a0"])("splits multiple addresses separated by %j", separator => {
     const result = prepareContacts([[`INFO@example.com${separator}sales@example.com${separator}office@example.com`, "Иванов Иван", "Компания", "Москва", "vip;crm"]], ["email", "full_name", "company", "custom:city", "tags"], "база.xlsx", 2);
     expect(result.contacts.map(c => c.email)).toEqual(["info@example.com", "sales@example.com", "office@example.com"]);

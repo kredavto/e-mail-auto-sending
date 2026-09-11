@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import { cellText, guessMapping, importFields, parseCsv, prepareContacts } from "../lib/contact-import";
+import { cellText, guessMapping, importFields, MAX_IMPORT_FILE_MB, parseCsv, prepareContacts, validateContactFileSize } from "../lib/contact-import";
 import type { Contact, ContactPage } from "../lib/mailing";
 
 type ImportResult = { created: number; skipped: number; errors: string[] };
@@ -29,7 +29,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
     const ticket = ++request.current;
     setBusy(true); setError(""); setResult(null); setRows([]); setMapping([]); setFile(nextFile);
     try {
-      if (nextFile.size > 10 * 1024 * 1024) throw new Error("Файл больше 10 МБ. Разделите базу на несколько файлов.");
+      validateContactFileSize(nextFile.size);
       let parsed: string[][];
       if (/\.xlsx$/i.test(nextFile.name)) {
         const { default: readXlsxFile } = await import("read-excel-file/browser");
@@ -68,7 +68,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
   }
   return <div className="space-y-5">
     <section className="panel space-y-4"><h2 className="font-display text-2xl font-bold">Загрузить базу контактов</h2>
-      <p className="hint">Excel .xlsx или CSV · до 10 МБ / 5000 контактов после разделения email. В одной ячейке можно указать несколько адресов через запятую, точку с запятой, пробел или перенос строки. Каждый email станет отдельным контактом с данными исходной строки. Файл разбирается в браузере; сохранение — после подтверждения. Также действуют лимиты вашего тарифа.</p>
+      <p className="hint">Excel .xlsx или CSV · до {MAX_IMPORT_FILE_MB} МБ / 5000 контактов после разделения email. В одной ячейке можно указать несколько адресов через запятую, точку с запятой, пробел или перенос строки. Каждый email станет отдельным контактом с данными исходной строки. Файл разбирается в браузере; сохранение — после подтверждения. Также действуют лимиты вашего тарифа.</p>
       <label className="field">Файл контактов<input type="file" accept=".xlsx,.csv" disabled={busy} onChange={e => { const selected = e.target.files?.[0]; if (selected) void loadFile(selected); }} /></label>
       {error && <p role="alert" className="error-box">{error}</p>}
       {busy && <p role="status">Обрабатываем…</p>}
