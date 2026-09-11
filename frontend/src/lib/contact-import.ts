@@ -41,7 +41,7 @@ export function parseCsv(text: string): string[][] {
   return result.data.map(row => row.map(cellText));
 }
 export type ImportedContact = { email: string; full_name: string; company: string; position: string; source: string; tags: string[]; custom_fields: Record<string, string>; [key: string]: unknown };
-export const MAX_IMPORT_CONTACTS = 5000;
+export const MAX_IMPORT_CONTACTS = 10000;
 export function splitEmailCell(value: string): string[] {
   return value.split(/[,;\s]+/u).map(email => email.trim().toLowerCase()).filter(Boolean);
 }

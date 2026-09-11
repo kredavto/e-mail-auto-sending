@@ -1,7 +1,7 @@
 import re
 
 from app.core.exceptions import AppError
-from app.modules.contacts.schemas import ContactCreate
+from app.modules.contacts.schemas import MAX_IMPORT_CONTACTS, ContactCreate
 
 
 def prepare_import_rows(rows: list[dict[str, object]]) -> tuple[list[ContactCreate], list[str]]:
@@ -31,9 +31,9 @@ def prepare_import_rows(rows: list[dict[str, object]]) -> tuple[list[ContactCrea
                     "Корректные адреса строки обрабатываются отдельно."
                 )
                 continue
-            if len(contacts) >= 5000:
+            if len(contacts) >= MAX_IMPORT_CONTACTS:
                 raise AppError(
-                    "После разделения email получилось больше 5000 контактов. "
+                    f"После разделения email получилось больше {MAX_IMPORT_CONTACTS} контактов. "
                     "Разделите файл; контакты не были сохранены."
                 )
             contacts.append(contact)

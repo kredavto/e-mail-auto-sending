@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import { cellText, guessMapping, importFields, MAX_IMPORT_FILE_MB, parseCsv, prepareContacts, validateContactFileSize } from "../lib/contact-import";
+import { cellText, guessMapping, importFields, MAX_IMPORT_CONTACTS, MAX_IMPORT_FILE_MB, parseCsv, prepareContacts, validateContactFileSize } from "../lib/contact-import";
 import type { Contact, ContactPage } from "../lib/mailing";
 
 type ImportResult = { created: number; skipped: number; errors: string[] };
@@ -50,7 +50,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
         if (ticket !== request.current) return;
         setSheets([]); setSheet("");
       } else throw new Error("Поддерживаются .xlsx и .csv. Старый .xls сохраните в Excel как .xlsx.");
-      if (parsed.length > 5001 || parsed.some(row => row.length > 100)) throw new Error("Лимит: 5000 строк контактов и 100 колонок. Разделите файл.");
+      if (parsed.length > MAX_IMPORT_CONTACTS + 1 || parsed.some(row => row.length > 100)) throw new Error(`Лимит: ${MAX_IMPORT_CONTACTS} строк контактов и 100 колонок. Разделите файл.`);
       if (parsed.length < 2) throw new Error("Нужны строка заголовков и хотя бы одна строка данных.");
       setRows(parsed); setHeaderRow(1); setMapping(guessMapping(parsed[0]));
     } catch (reason) { if (ticket === request.current) setError(reason instanceof Error ? reason.message : "Не удалось прочитать файл"); }
@@ -68,7 +68,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
   }
   return <div className="space-y-5">
     <section className="panel space-y-4"><h2 className="font-display text-2xl font-bold">Загрузить базу контактов</h2>
-      <p className="hint">Excel .xlsx или CSV · до {MAX_IMPORT_FILE_MB} МБ / 5000 контактов после разделения email. В одной ячейке можно указать несколько адресов через запятую, точку с запятой, пробел или перенос строки. Каждый email станет отдельным контактом с данными исходной строки. Файл разбирается в браузере; сохранение — после подтверждения. Также действуют лимиты вашего тарифа.</p>
+      <p className="hint">Excel .xlsx или CSV · до {MAX_IMPORT_FILE_MB} МБ / {MAX_IMPORT_CONTACTS} контактов после разделения email. До {MAX_IMPORT_CONTACTS} строк данных и отдельная строка заголовков. В одной ячейке можно указать несколько адресов через запятую, точку с запятой, пробел или перенос строки. Каждый email станет отдельным контактом с данными исходной строки. Файл разбирается в браузере; сохранение — после подтверждения. Также действуют лимиты вашего тарифа.</p>
       <label className="field">Файл контактов<input type="file" accept=".xlsx,.csv" disabled={busy} onChange={e => { const selected = e.target.files?.[0]; if (selected) void loadFile(selected); }} /></label>
       {error && <p role="alert" className="error-box">{error}</p>}
       {busy && <p role="status">Обрабатываем…</p>}

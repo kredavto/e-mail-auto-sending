@@ -4,6 +4,8 @@ from pydantic import BaseModel, EmailStr, Field
 
 from app.shared.dto import ORMModel
 
+MAX_IMPORT_CONTACTS = 10000
+
 
 class ContactBase(BaseModel):
     email: EmailStr
@@ -57,7 +59,7 @@ class ContactResponse(ContactBase, ORMModel):
 
 
 class BulkContactsCreate(BaseModel):
-    contacts: list[ContactCreate] = Field(max_length=5000)
+    contacts: list[ContactCreate] = Field(max_length=MAX_IMPORT_CONTACTS)
 
 
 class BulkResult(BaseModel):

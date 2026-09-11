@@ -31,7 +31,7 @@ test("50 MiB CSV is parsed and imported; larger CSV and XLSX are rejected before
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Контакты и импорт", exact: true }).click();
-  await expect(page.getByText("Excel .xlsx или CSV", { exact: false })).toContainText("до 50 МБ / 5000 контактов");
+  await expect(page.getByText("Excel .xlsx или CSV", { exact: false })).toContainText("до 50 МБ / 10000 контактов");
   const input = page.getByLabel("Файл контактов");
   // A real 50 MiB File, not a mocked size: whitespace represents non-contact data.
   // Construct in-browser to avoid Playwright's buffer-upload transport limit.

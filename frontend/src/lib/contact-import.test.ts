@@ -35,8 +35,8 @@ describe("contact import", () => {
   });
   it("enforces the contact limit after expansion without silently truncating", () => {
     const emails = Array.from({ length: MAX_IMPORT_CONTACTS }, (_, i) => `c${i}@example.com`);
-    expect(prepareContacts([[emails.join(";")]], ["email"], "", 2).contacts).toHaveLength(5000);
-    expect(() => prepareContacts([[`${emails.join(";")};extra@example.com`]], ["email"], "", 2)).toThrow("5000");
+    expect(prepareContacts([[emails.join(";")]], ["email"], "", 2).contacts).toHaveLength(10000);
+    expect(() => prepareContacts([[`${emails.join(";")};extra@example.com`]], ["email"], "", 2)).toThrow("10000");
   });
   it("rejects invalid individual addresses but preserves Unicode domains", () => {
     const result = prepareContacts([["a..b@example.com;.name@example.com;a@-example.com;info@пример.рф"]], ["email"], "", 2);
