@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_name: str = "Premium B2B Mailer"
+    openai_api_key: SecretStr = SecretStr("")
+    openai_model: str = "gpt-5.6-luna"
+    assistant_daily_limit: int = 30
     app_env: str = "development"
     app_secret_key: str = "development-only-secret-key-change-me"
     database_url: str = "postgresql+asyncpg://mailer_app:mailer_app_local@localhost:5432/mailer"

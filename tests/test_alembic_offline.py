@@ -79,6 +79,7 @@ PHASE_TABLES = {
         "payment_events",
     },
     "0005_enterprise_delivery": {"notification_deliveries"},
+    "0006_assistant": {"assistant_runs"},
 }
 
 
@@ -98,7 +99,7 @@ def _duplicates(names: list[str]) -> set[str]:
 
 
 def _revision_sections(sql: str) -> dict[str, str]:
-    markers = list(re.finditer(r"^-- Running upgrade .*->\s*(000[1-5]_[a-z0-9_]+)\s*$", sql, re.M))
+    markers = list(re.finditer(r"^-- Running upgrade .*->\s*(000[1-6]_[a-z0-9_]+)\s*$", sql, re.M))
     sections: dict[str, str] = {}
     for index, marker in enumerate(markers):
         end = markers[index + 1].start() if index + 1 < len(markers) else len(sql)

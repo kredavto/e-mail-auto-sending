@@ -13,6 +13,7 @@ from app.core.middleware import (
 )
 from app.modules.ab_testing.router import router as ab_testing_router
 from app.modules.analytics.router import router as analytics_router
+from app.modules.assistant.router import router as assistant_router
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.router import router as auth_router
 from app.modules.billing.router import router as billing_router
@@ -67,6 +68,7 @@ def create_app() -> FastAPI:
     app.add_middleware(AuditContextMiddleware)
     install_exception_handlers(app)
     for router in (
+        assistant_router,
         auth_router,
         users_router,
         profile_router,

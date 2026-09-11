@@ -21,3 +21,4 @@ bleach[css]>=6.2
 cryptography>=44
 dnspython>=2.7
 pywebpush>=2.0
+openai-agents==0.22.2

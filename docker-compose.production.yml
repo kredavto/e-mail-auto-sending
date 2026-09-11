@@ -171,7 +171,11 @@ services:
       dockerfile: infrastructure/docker/Dockerfile.api
     container_name: premium-b2b-mailer-api
     restart: unless-stopped
-    environment: *app-env
+    environment:
+      <<: *app-env
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.6-luna}
+      ASSISTANT_DAILY_LIMIT: ${ASSISTANT_DAILY_LIMIT:-30}
     depends_on:
       migrate:
         condition: service_completed_successfully

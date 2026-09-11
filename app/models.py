@@ -2,6 +2,7 @@
 
 from app.modules.ab_testing.models import ABTest, ABTestAssignment, ABTestVariant
 from app.modules.analytics.models import AnalyticsReport, DailyMetric
+from app.modules.assistant.models import AssistantRun
 from app.modules.audit.models import AuditExport, AuditLog, SecurityAuditEvent
 from app.modules.auth.models import AuthSession
 from app.modules.billing.models import Invoice, PaymentEvent, Subscription, UsageLog
@@ -36,6 +37,7 @@ from app.modules.warmup.models import WarmupPlan
 from app.modules.webhooks.models import Webhook, WebhookDelivery, WebhookOutbox
 
 __all__ = [
+    "AssistantRun",
     "AuthSession",
     "AuditExport",
     "AuditLog",
