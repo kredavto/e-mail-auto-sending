@@ -83,7 +83,7 @@ async def usage(
 ) -> UsageResponse:
     service = BillingService(db, tenant.workspace_id)
     subscription = await service.get_or_create_subscription()
-    limits = service._get_limits(subscription.plan)
+    limits = service.effective_limits(subscription.plan)
     pairs = (
         ("emails_sent", "emails_per_month"),
         ("contacts_stored", "contacts"),
@@ -104,6 +104,7 @@ async def usage(
         )
     return UsageResponse(
         plan=subscription.plan,
+        free_plan_test_mode=service.free_test_access(subscription.plan),
         period_start=subscription.current_period_start,
         period_end=subscription.current_period_end,
         items=items,

@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-5.6-luna"
     assistant_daily_limit: int = 30
     app_env: str = "development"
+    free_plan_test_mode: bool = False
     app_secret_key: str = "development-only-secret-key-change-me"
     database_url: str = "postgresql+asyncpg://mailer_app:mailer_app_local@localhost:5432/mailer"
     migration_database_url: str | None = None

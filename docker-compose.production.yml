@@ -2,6 +2,7 @@ name: premium-b2b-mailer
 
 x-app-env: &app-env
   APP_ENV: production
+  FREE_PLAN_TEST_MODE: ${FREE_PLAN_TEST_MODE:-false}
   APP_SECRET_KEY: ${APP_SECRET_KEY:?APP_SECRET_KEY is required}
   DATABASE_URL: postgresql+asyncpg://${POSTGRES_RUNTIME_USER:?POSTGRES_RUNTIME_USER is required}:${POSTGRES_RUNTIME_PASSWORD:?POSTGRES_RUNTIME_PASSWORD is required}@mailer-postgres:5432/mailer
   DATABASE_NULL_POOL: ${DATABASE_NULL_POOL:-false}

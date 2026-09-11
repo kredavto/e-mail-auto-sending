@@ -44,6 +44,7 @@ class UsageItem(BaseModel):
 
 class UsageResponse(BaseModel):
     plan: str
+    free_plan_test_mode: bool = False
     period_start: datetime
     period_end: datetime
     items: list[UsageItem]

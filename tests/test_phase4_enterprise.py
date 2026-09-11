@@ -159,6 +159,7 @@ async def test_webhook_delivery_records_failed_attempt(monkeypatch: pytest.Monke
 class StubBilling(BillingService):
     def __init__(self, plan: str, current: int) -> None:
         self.plan, self.current = plan, current
+        self.settings = Settings(_env_file=None, free_plan_test_mode=False)
         self.db = Mock()
         self.workspace_id = uuid4()
         self.repo = SimpleNamespace(subscription=AsyncMock(return_value=None))

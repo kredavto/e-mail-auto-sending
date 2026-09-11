@@ -102,6 +102,15 @@ class BillingService:
         await self.db.flush()
         return row
 
+    def free_test_access(self, plan: str) -> bool:
+        return plan == "free" and self.settings.free_plan_test_mode
+
+    def effective_limits(self, plan: str) -> dict[str, int | None]:
+        limits = self._get_limits(plan)
+        if self.free_test_access(plan):
+            return {key: None for key in limits}
+        return limits.copy()
+
     async def _lock_workspace_quota(self) -> None:
         """Lock a quota namespace even before the workspace has a subscription row."""
         if isinstance(self.db, AsyncSession):
@@ -129,7 +138,7 @@ class BillingService:
             "users": "users",
             "api_calls": "api_calls",
         }[metric]
-        limit = self._get_limits(subscription.plan).get(limit_key)
+        limit = self.effective_limits(subscription.plan).get(limit_key)
         if limit is None:
             return True
         current = await self.current_usage(metric, subscription.current_period_start)
