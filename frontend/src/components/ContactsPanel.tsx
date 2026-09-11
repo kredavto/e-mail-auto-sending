@@ -5,6 +5,7 @@ import { cellText, contactImportBatches, guessMapping, importFields, MAX_IMPORT_
 import type { Contact, ContactPage } from "../lib/mailing";
 
 type ImportResult = { created: number; skipped: number; errors: string[] };
+type ContactList = { id: string; name: string };
 export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string; onPreview: (contact: Contact) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [sheets, setSheets] = useState<string[]>([]);
@@ -17,12 +18,27 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
   const [result, setResult] = useState<ImportResult | null>(null);
   const [completed, setCompleted] = useState(false);
   const [progress, setProgress] = useState(0);
-  const upload = useRef<{ contacts: ImportedContact[]; workspaceId: string; batches: ReturnType<typeof contactImportBatches>; next: number; processed: number; report: ImportResult } | null>(null);
+  const [importName, setImportName] = useState("");
+  const [selectedList, setSelectedList] = useState("");
+  const [listName, setListName] = useState("");
+  const [listBusy, setListBusy] = useState(false);
+  const upload = useRef<{ contacts: ImportedContact[]; workspaceId: string; listId?: string; batches: ReturnType<typeof contactImportBatches>; next: number; processed: number; report: ImportResult } | null>(null);
   const [page, setPage] = useState(1);
   const [encoding, setEncoding] = useState("auto");
   const request = useRef(0);
   const client = useQueryClient();
-  const contacts = useQuery({ queryKey: ["contacts", workspaceId, page], enabled: !!workspaceId, queryFn: () => api<ContactPage>(`/contacts?page=${page}&page_size=25`, { workspaceId }) });
+  const lists = useQuery({ queryKey: ["contact-lists", workspaceId], enabled: !!workspaceId, queryFn: () => api<ContactList[]>("/contacts/lists", { workspaceId }) });
+  const contacts = useQuery({ queryKey: ["contacts", workspaceId, selectedList, page], enabled: !!workspaceId, queryFn: () => api<ContactPage>(`/contacts?page=${page}&page_size=25${selectedList ? `&list_id=${selectedList}` : ""}`, { workspaceId }) });
+  async function saveListName() {
+    if (!listName.trim() || listBusy || busy || !workspaceId) return;
+    setListBusy(true); setError("");
+    try {
+      const saved = await api<ContactList>(selectedList ? `/contacts/lists/${selectedList}` : "/contacts/lists", { workspaceId, method: selectedList ? "PATCH" : "POST", body: JSON.stringify({ name: listName.trim(), ...(!selectedList ? { include_existing: true } : {}) }) });
+      await client.invalidateQueries({ queryKey: ["contact-lists", workspaceId] });
+      setSelectedList(saved.id); setListName(saved.name); setPage(1);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось сохранить название базы"); }
+    finally { setListBusy(false); }
+  }
   const headers = rows[headerRow - 1] ?? [];
   const prepared = useMemo(() => {
     try { return { ...prepareContacts(rows.slice(headerRow), mapping, file?.name ?? "", headerRow + 1), problem: "" }; }
@@ -31,6 +47,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
   async function loadFile(nextFile: File, nextSheet = "", nextEncoding = encoding) {
     const ticket = ++request.current;
     setBusy(true); setError(""); setResult(null); setCompleted(false); setProgress(0); upload.current = null; setRows([]); setMapping([]); setFile(nextFile);
+    setImportName(nextFile.name.replace(/\.(xlsx|csv)$/i, "").slice(0, 200));
     try {
       validateContactFileSize(nextFile.size);
       let parsed: string[][];
@@ -61,7 +78,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
     finally { if (ticket === request.current) setBusy(false); }
   }
   async function importContacts() {
-    if (busy || !workspaceId || prepared.problem || !prepared.contacts.length || (completed && result)) return;
+    if (busy || listBusy || !workspaceId || !importName.trim() || prepared.problem || !prepared.contacts.length || (completed && result)) return;
     setBusy(true); setError(""); setCompleted(false);
     try {
       if (upload.current?.contacts !== prepared.contacts || upload.current.workspaceId !== workspaceId) {
@@ -69,9 +86,15 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
         upload.current = { contacts: prepared.contacts, workspaceId, batches: contactImportBatches(prepared.contacts), next: 0, processed: 0, report: { created: 0, skipped: 0, errors: [] } };
       }
       const run = upload.current;
+      if (!run.listId) {
+        const saved = await api<ContactList>("/contacts/lists", { workspaceId, method: "POST", body: JSON.stringify({ name: importName.trim() }) });
+        run.listId = saved.id;
+        await client.invalidateQueries({ queryKey: ["contact-lists", workspaceId] });
+        setSelectedList(saved.id); setListName(saved.name); setPage(1);
+      }
       while (run.next < run.batches.length) {
         const batch = run.batches[run.next];
-        const report = await api<ImportResult>("/contacts/bulk", { workspaceId, method: "POST", body: batch.body });
+        const report = await api<ImportResult>("/contacts/bulk", { workspaceId, method: "POST", body: JSON.stringify({ ...JSON.parse(batch.body), list_id: run.listId }) });
         run.report = { created: run.report.created + report.created, skipped: run.report.skipped + report.skipped, errors: [...run.report.errors, ...report.errors.map(message => `Порция ${run.next + 1}: ${message}`)] };
         run.next++; run.processed += batch.count;
         setProgress(run.processed); setResult(run.report);
@@ -95,6 +118,8 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
       {error && <p role="alert" className="error-box">{error}</p>}
       {busy && <p role="status">{upload.current ? `Сохранение: ${progress} из ${prepared.contacts.length}. Не закрывайте вкладку.` : "Обрабатываем…"}</p>}
       {!!rows.length && <>
+        <label className="field">Название загружаемой базы<input maxLength={200} value={importName} disabled={busy || !!upload.current?.listId} onChange={e => setImportName(e.target.value)} /></label>
+        <p className="hint">База появится в списке после подтверждения импорта. Позже её можно переименовать. Повторные email будут включены в базу без создания дублей контактов.</p>
         <div className="flex flex-wrap gap-3">
           {!!sheets.length && <label className="field">Лист Excel<select disabled={busy} value={sheet} onChange={e => file && void loadFile(file, e.target.value)}>{sheets.map(name => <option key={name}>{name}</option>)}</select></label>}
           {!sheets.length && <label className="field">Кодировка CSV<select disabled={busy} value={encoding} onChange={e => { setEncoding(e.target.value); if (file) void loadFile(file, "", e.target.value); }}><option value="auto">Автоматически</option><option value="utf-8">UTF-8</option><option value="windows-1251">Windows-1251</option></select></label>}
@@ -112,12 +137,18 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
         {!!prepared.errors.length && <details><summary>Показать ошибки строк</summary><ul className="max-h-48 overflow-auto text-sm">{prepared.errors.map(message => <li key={message}>{message}</li>)}</ul></details>}
         {!!prepared.warnings.length && <details><summary>Предупреждения: {prepared.warnings.length} — не мешают импорту</summary><ul className="max-h-48 overflow-auto text-sm">{prepared.warnings.slice(0, 100).map(message => <li key={message}>{message}</li>)}</ul>{prepared.warnings.length > 100 && <p className="hint">Показаны первые 100 предупреждений. Полные значения сохраняются для всех контактов.</p>}</details>}
         {!!prepared.contacts.length && <div className="overflow-x-auto"><table className="data-table"><caption className="mb-2 text-left font-semibold">Предпросмотр — первые 5 контактов</caption><thead><tr><th>Email</th><th>Ф.И.О.</th><th>Организация</th><th>Должность</th><th>Доп. поля</th></tr></thead><tbody>{prepared.contacts.slice(0, 5).map(contact => <tr key={contact.email}><td>{contact.email}</td><td>{contact.full_name}</td><td>{contact.company}</td><td>{contact.position}</td><td>{Object.entries(contact.custom_fields).map(([key, value]) => `${key}: ${value}`).join(" · ")}</td></tr>)}</tbody></table></div>}
-        <button className="button primary" onClick={importContacts} disabled={busy || !workspaceId || !prepared.contacts.length || !!prepared.problem || (completed && !!result)}>Импортировать {prepared.contacts.length} контактов</button>
+        <button className="button primary" onClick={importContacts} disabled={busy || listBusy || !workspaceId || !importName.trim() || !prepared.contacts.length || !!prepared.problem || (completed && !!result)}>Импортировать {prepared.contacts.length} контактов</button>
         {!workspaceId && <p className="hint">Для сохранения войдите и выберите рабочее пространство выше.</p>}
         {result && <div role="status" className="success-box">Создано: {result.created}. Уже были в базе: {result.skipped}. Ошибки сервера: {result.errors.length}.{!!result.errors.length && <ul>{result.errors.map((message, index) => <li key={index}>{message}</li>)}</ul>}</div>}
       </>}
     </section>
     <section className="panel"><h2 className="mb-4 font-display text-2xl font-bold">База контактов {contacts.data ? `· ${contacts.data.total}` : ""}</h2>
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <label className="field">Выбрать базу контактов<select value={selectedList} disabled={busy || listBusy} onChange={e => { setSelectedList(e.target.value); setListName(lists.data?.find(item => item.id === e.target.value)?.name ?? ""); setPage(1); }}><option value="">Все контакты</option>{lists.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="field">Название сохранённой базы<input maxLength={200} value={listName} disabled={busy || listBusy} onChange={e => setListName(e.target.value)} /></label>
+        <button className="button" disabled={busy || listBusy || !workspaceId || !listName.trim()} onClick={() => void saveListName()}>{selectedList ? "Сохранить название" : "Сохранить все контакты как базу"}</button>
+      </div>
+      {lists.error && <p role="alert" className="error-box">{lists.error.message}</p>}
       {contacts.error && <p role="alert" className="error-box">{contacts.error.message}</p>}
       {contacts.isFetching && <p>Загрузка…</p>}
       {contacts.data && <><div className="overflow-x-auto"><table className="data-table"><thead><tr><th>Email</th><th>Ф.И.О.</th><th>Организация</th><th>Телефон</th><th>Статус</th><th>Письмо</th></tr></thead><tbody>{contacts.data.items.map(contact => <tr key={contact.id}><td>{contact.email}</td><td>{contact.full_name || "—"}</td><td>{contact.company || "—"}</td><td>{contact.phone || "—"}</td><td>{contact.status}</td><td><button className="button" onClick={() => onPreview(contact)}>Подставить в письмо</button></td></tr>)}</tbody></table></div>

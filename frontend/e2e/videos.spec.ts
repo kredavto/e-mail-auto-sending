@@ -29,7 +29,8 @@ test("MP4 upload, player, linked poster, persistence and removal", async ({ page
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
   await page.addInitScript(() => { localStorage.setItem("access_token", "test-token"); localStorage.setItem("workspace_id", "test-workspace"); });
-  await page.route("**/api/v1/**", async route => {
+ await page.route("**/api/v1/**", async route => {
+      if (new URL(route.request().url()).pathname.endsWith("/contacts/lists")) return route.fulfill({ json: route.request().method() === "POST" ? { id: "test-list", name: route.request().postDataJSON().name } : [{ id: "test-list", name: "Тестовая база" }] });
     const path = new URL(route.request().url()).pathname.replace("/api/v1", "");
     const method = route.request().method();
     const reply = (data: unknown, status = 200) => route.fulfill({ status, json: data });

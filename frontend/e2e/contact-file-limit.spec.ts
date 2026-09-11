@@ -13,7 +13,8 @@ test("50 MiB CSV is parsed and imported; larger CSV and XLSX are rejected before
     localStorage.setItem("workspace_id", "test-workspace");
   });
   const contact = { id: "test-contact", email: "large@example.com", company: "Тест", full_name: "", status: "new" };
-  await page.route("**/api/v1/**", route => {
+ await page.route("**/api/v1/**", route => {
+      if (new URL(route.request().url()).pathname.endsWith("/contacts/lists")) return route.fulfill({ json: route.request().method() === "POST" ? { id: "test-list", name: route.request().postDataJSON().name } : [{ id: "test-list", name: "Тестовая база" }] });
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/workspaces")) return route.fulfill({ json: [{ id: "test-workspace", name: "Тест" }] });
     if (path.endsWith("/templates")) return route.fulfill({ json: [] });

@@ -5,7 +5,8 @@ test("sender selector: choose, type, save draft, reload and reuse new address", 
   let created = 0;
   await page.route("https://fonts.googleapis.com/**", r => r.abort());
   await page.route("https://fonts.gstatic.com/**", r => r.abort());
-  await page.route("**/api/v1/**", async route => {
+ await page.route("**/api/v1/**", async route => {
+      if (new URL(route.request().url()).pathname.endsWith("/contacts/lists")) return route.fulfill({ json: route.request().method() === "POST" ? { id: "test-list", name: route.request().postDataJSON().name } : [{ id: "test-list", name: "Тестовая база" }] });
     const path = new URL(route.request().url()).pathname.replace("/api/v1", "");
     const reply = (json: unknown) => route.fulfill({ json });
     if (path === "/auth/login") return reply({ access_token: "test", refresh_token: "refresh" });

@@ -12,7 +12,8 @@ test("70000 data rows plus a header import intact in batches; row and expanded-e
     localStorage.setItem("access_token", "test-token");
     localStorage.setItem("workspace_id", "test-workspace");
   });
-  await page.route("**/api/v1/**", route => {
+ await page.route("**/api/v1/**", route => {
+      if (new URL(route.request().url()).pathname.endsWith("/contacts/lists")) return route.fulfill({ json: route.request().method() === "POST" ? { id: "test-list", name: route.request().postDataJSON().name } : [{ id: "test-list", name: "Тестовая база" }] });
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/workspaces")) return route.fulfill({ json: [{ id: "test-workspace", name: "Тест" }] });
     if (path.endsWith("/templates")) return route.fulfill({ json: [] });
@@ -63,6 +64,7 @@ test("interrupted import reports saved contacts and resumes without repeating co
     localStorage.setItem("workspace_id", "test-workspace");
   });
   await page.route("**/api/v1/**", route => {
+      if (new URL(route.request().url()).pathname.endsWith("/contacts/lists")) return route.fulfill({ json: route.request().method() === "POST" ? { id: "test-list", name: route.request().postDataJSON().name } : [{ id: "test-list", name: "Тестовая база" }] });
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/workspaces")) return route.fulfill({ json: [{ id: "test-workspace", name: "Тест" }] });
     if (path.endsWith("/templates")) return route.fulfill({ json: [] });

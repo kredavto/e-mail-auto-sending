@@ -17,6 +17,7 @@ from app.modules.assistant.schemas import (
 )
 from app.modules.assistant.service import AssistantService
 from app.modules.campaigns.schemas import CampaignResponse
+from app.modules.contacts.lists import ContactLists, list_tag
 from app.modules.contacts.models import Contact
 from app.modules.contacts.schemas import ContactResponse
 
@@ -26,6 +27,7 @@ router = APIRouter(prefix="/assistant", tags=["assistant"])
 @router.get("/contacts", response_model=Page[ContactResponse])
 async def eligible_contacts(
     search: str = Query(default="", max_length=200),
+    list_id: UUID | None = None,
     pagination: PageParams = Depends(),
     tenant: TenantContext = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_db),
@@ -36,6 +38,9 @@ async def eligible_contacts(
         Contact.has_replied.is_(False),
         Contact.status.notin_(["bounced", "meeting_booked"]),
     ]
+    if list_id:
+        await ContactLists(db, tenant.workspace_id).get(list_id)
+        filters.append(Contact.tags.contains([list_tag(list_id)]))
     if search.strip():
         filters.append(
             or_(

@@ -12,7 +12,8 @@ test("CSV → server import → stage template → personalized HTML and clickab
   let savedPayload: Record<string, unknown> | null = null;
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
-  await page.route("**/api/v1/**", async route => {
+ await page.route("**/api/v1/**", async route => {
+      if (new URL(route.request().url()).pathname.endsWith("/contacts/lists")) return route.fulfill({ json: route.request().method() === "POST" ? { id: "test-list", name: route.request().postDataJSON().name } : [{ id: "test-list", name: "Тестовая база" }] });
     const path = new URL(route.request().url()).pathname.replace("/api/v1", "");
     const method = route.request().method();
     const payload = method === "POST" || method === "PATCH" ? route.request().postDataJSON() : null;

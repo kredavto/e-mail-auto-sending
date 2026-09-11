@@ -11,7 +11,8 @@ test("AI draft → saved editor template; schedule stays unchanged until confirm
   const draft = { name: "ИИ-черновик", category: "first_contact" as const, subject: "Идея для вашей компании", paragraphs: ["Здравствуйте! Предлагаем обсудить внедрение CRM."], editor_state: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Здравствуйте! Предлагаем обсудить внедрение CRM." }] }] } };
   await page.route("https://fonts.googleapis.com/**", r => r.abort());
   await page.route("https://fonts.gstatic.com/**", r => r.abort());
-  await page.route("**/api/v1/**", async route => {
+ await page.route("**/api/v1/**", async route => {
+      if (new URL(route.request().url()).pathname.endsWith("/contacts/lists")) return route.fulfill({ json: route.request().method() === "POST" ? { id: "test-list", name: route.request().postDataJSON().name } : [{ id: "test-list", name: "Тестовая база" }] });
     const path = new URL(route.request().url()).pathname.replace("/api/v1", "");
     const method = route.request().method();
     const reply = (json: unknown, status = 200) => route.fulfill({ status, json });

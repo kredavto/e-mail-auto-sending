@@ -9,7 +9,8 @@ test("workspace typography is readable without changing email typography", async
     localStorage.setItem("access_token", "test-token");
     localStorage.setItem("workspace_id", "test-workspace");
   });
-  await page.route("**/api/v1/**", route => {
+ await page.route("**/api/v1/**", route => {
+      if (new URL(route.request().url()).pathname.endsWith("/contacts/lists")) return route.fulfill({ json: route.request().method() === "POST" ? { id: "test-list", name: route.request().postDataJSON().name } : [{ id: "test-list", name: "Тестовая база" }] });
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/workspaces")) return route.fulfill({ json: [{ id: "test-workspace", name: "Тест" }] });
     if (path.endsWith("/contacts")) return route.fulfill({ json: { items: [], total: 0 } });

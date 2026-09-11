@@ -10,11 +10,15 @@ from app.database import get_db
 from app.modules.audit.service import AuditService
 from app.modules.billing.service import BillingService
 from app.modules.contacts.importing import prepare_import_rows
+from app.modules.contacts.lists import ContactLists
 from app.modules.contacts.repository import ContactRepository
 from app.modules.contacts.schemas import (
     BulkContactsCreate,
     BulkResult,
     ContactCreate,
+    ContactListCreate,
+    ContactListName,
+    ContactListResponse,
     ContactResponse,
     ContactUpdate,
     SegmentCreate,
@@ -28,12 +32,15 @@ router = APIRouter(prefix="/contacts", tags=["contacts"])
 
 @router.get("", response_model=Page[ContactResponse])
 async def list_contacts(
+    list_id: UUID | None = None,
     pagination: PageParams = Depends(),
     tenant: TenantContext = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_db),
 ) -> Page[ContactResponse]:
+    if list_id:
+        await ContactLists(db, tenant.workspace_id).get(list_id)
     items, total = await ContactRepository(db, tenant.workspace_id).list_all(
-        pagination.offset, pagination.page_size
+        pagination.offset, pagination.page_size, list_id
     )
     return Page(
         items=[ContactResponse.model_validate(i) for i in items],
@@ -100,10 +107,15 @@ async def bulk(
     tenant: TenantContext = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_db),
 ) -> BulkResult:
+    lists = ContactLists(db, tenant.workspace_id)
+    if data.list_id:
+        await lists.get(data.list_id)
     await BillingService(db, tenant.workspace_id).check_limits(
         "create_contact", max(1, len(data.contacts))
     )
     result = await ContactService(db, tenant.workspace_id).bulk(data.contacts)
+    if data.list_id:
+        await lists.attach(data.list_id, [str(contact.email).lower() for contact in data.contacts])
     if result.created:
         await publish_enterprise_event(
             db,
@@ -183,3 +195,34 @@ async def create_segment(
     return SegmentResponse.model_validate(
         await ContactService(db, tenant.workspace_id).create_segment(data)
     )
+
+
+@router.get("/lists", response_model=list[ContactListResponse])
+async def contact_lists(
+    tenant: TenantContext = Depends(get_tenant_context), db: AsyncSession = Depends(get_db)
+):
+    return await ContactLists(db, tenant.workspace_id).all()
+
+
+@router.post("/lists", response_model=ContactListResponse, status_code=201)
+async def create_contact_list(
+    data: ContactListCreate,
+    tenant: TenantContext = Depends(get_tenant_context),
+    db: AsyncSession = Depends(get_db),
+):
+    return await ContactLists(db, tenant.workspace_id).create(
+        data.name.strip(), data.include_existing
+    )
+
+
+@router.patch("/lists/{list_id}", response_model=ContactListResponse)
+async def rename_contact_list(
+    list_id: UUID,
+    data: ContactListName,
+    tenant: TenantContext = Depends(get_tenant_context),
+    db: AsyncSession = Depends(get_db),
+):
+    row = await ContactLists(db, tenant.workspace_id).get(list_id)
+    row.name = data.name.strip()
+    await db.flush()
+    return row

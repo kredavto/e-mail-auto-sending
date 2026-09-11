@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.contacts.lists import list_tag
 from app.modules.contacts.models import Contact, Segment
 
 
@@ -13,8 +14,13 @@ class ContactRepository:
         self.db = db
         self.workspace_id = workspace_id
 
-    async def list_all(self, offset: int = 0, limit: int = 50) -> tuple[list[Contact], int]:
-        base = select(Contact).where(Contact.workspace_id == self.workspace_id)
+    async def list_all(
+        self, offset: int = 0, limit: int = 50, list_id: UUID | None = None
+    ) -> tuple[list[Contact], int]:
+        filters = [Contact.workspace_id == self.workspace_id]
+        if list_id:
+            filters.append(Contact.tags.contains([list_tag(list_id)]))
+        base = select(Contact).where(*filters)
         items = list(
             (
                 await self.db.scalars(
@@ -22,11 +28,7 @@ class ContactRepository:
                 )
             ).all()
         )
-        total = await self.db.scalar(
-            select(func.count())
-            .select_from(Contact)
-            .where(Contact.workspace_id == self.workspace_id)
-        )
+        total = await self.db.scalar(select(func.count()).select_from(Contact).where(*filters))
         return items, int(total or 0)
 
     async def get(self, contact_id: UUID) -> Contact | None:

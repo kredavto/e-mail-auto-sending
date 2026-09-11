@@ -7,7 +7,8 @@ test("general letter: thematic heading, no name, save/reopen/copy, safe switchin
   page.on("pageerror", error => errors.push(error.message));
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
-  await page.route("**/api/v1/**", async route => {
+ await page.route("**/api/v1/**", async route => {
+      if (new URL(route.request().url()).pathname.endsWith("/contacts/lists")) return route.fulfill({ json: route.request().method() === "POST" ? { id: "test-list", name: route.request().postDataJSON().name } : [{ id: "test-list", name: "Тестовая база" }] });
     const path = new URL(route.request().url()).pathname.replace("/api/v1", "");
     const method = route.request().method();
     const payload = ["POST", "PATCH"].includes(method) ? route.request().postDataJSON() : null;

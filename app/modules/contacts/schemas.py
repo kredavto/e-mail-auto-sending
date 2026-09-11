@@ -67,6 +67,19 @@ class ContactResponse(ContactBase, ORMModel):
 
 class BulkContactsCreate(BaseModel):
     contacts: list[ContactCreate] = Field(max_length=MAX_IMPORT_CONTACTS)
+    list_id: UUID | None = None
+
+
+class ContactListName(BaseModel):
+    name: str = Field(min_length=1, max_length=200, pattern=r"\S")
+
+
+class ContactListCreate(ContactListName):
+    include_existing: bool = False
+
+
+class ContactListResponse(ContactListName, ORMModel):
+    id: UUID
 
 
 class BulkResult(BaseModel):

@@ -16,12 +16,14 @@ export function CampaignComposer({ workspaceId, templates, onCreated }: { worksp
   const [consent, setConsent] = useState(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [listId, setListId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const alive = useRef(true);
   const controller = useRef<AbortController | null>(null);
   useEffect(() => { alive.current = true; return () => { alive.current = false; controller.current?.abort(); }; }, []);
-  const contacts = useQuery({ queryKey: ["campaign-contacts", workspaceId, page, search], queryFn: ({ signal }) => api<ContactPage>(`/assistant/contacts?page=${page}&page_size=25&search=${encodeURIComponent(search)}`, { workspaceId, signal }) });
+  const lists = useQuery({ queryKey: ["contact-lists", workspaceId], enabled: !!workspaceId, queryFn: () => api<{ id: string; name: string }[]>("/contacts/lists", { workspaceId }) });
+  const contacts = useQuery({ queryKey: ["campaign-contacts", workspaceId, page, search, listId], queryFn: ({ signal }) => api<ContactPage>(`/assistant/contacts?page=${page}&page_size=25&search=${encodeURIComponent(search)}${listId ? `&list_id=${listId}` : ""}`, { workspaceId, signal }) });
   const campaigns = useQuery({ queryKey: ["campaigns", workspaceId], enabled: !!workspaceId, queryFn: ({ signal }) => api<{ sender_email: string }[]>("/campaigns", { workspaceId, signal }) });
   async function submit(event: React.FormEvent) {
     event.preventDefault(); if (busy || !consent || !selected.size) return;
@@ -40,6 +42,8 @@ export function CampaignComposer({ workspaceId, templates, onCreated }: { worksp
       <button type="button" className="button" disabled={steps.length >= 5} onClick={() => setSteps(previous => [...previous, ""])}>Добавить повторное письмо</button>
       <p className="hint">Первое письмо — в указанное время. Повторные — по будням с 09:00 до 18:00 МСК. После ответа, отписки или возврата цепочка останавливается.</p>
       <label className="field">Найти получателей<input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} /></label>
+      <label className="field">База получателей<select value={listId} onChange={e => { setListId(e.target.value); setPage(1); setSelected(new Set()); setConsent(false); }}><option value="">Все контакты</option>{lists.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      {lists.error && <p role="alert" className="error-box">{lists.error.message}</p>}
       <p className="font-semibold">Выбрано получателей: {selected.size} / 1000</p>
       <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-ink/15 p-3">{contacts.data?.items.map(contact => <label key={contact.id} className="flex gap-2 break-all"><input type="checkbox" checked={selected.has(contact.id)} disabled={!selected.has(contact.id) && selected.size >= 1000} onChange={e => setSelected(previous => { const next = new Set(previous); if (e.target.checked) next.add(contact.id); else next.delete(contact.id); return next; })} /><span>{contact.full_name || contact.email} · {contact.company} · {contact.email}</span></label>)}{contacts.isLoading && <p>Загрузка контактов…</p>}{contacts.data && !contacts.data.items.length && <p>Контакты не найдены. Импортируйте базу в разделе контактов.</p>}</div>
       <div className="flex gap-3"><button type="button" className="button" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Назад</button><span>Страница {page}</span><button type="button" className="button" disabled={!contacts.data || page * 25 >= contacts.data.total} onClick={() => setPage(p => p + 1)}>Далее</button><button type="button" className="button" onClick={() => setSelected(new Set())}>Снять выбор</button></div>
