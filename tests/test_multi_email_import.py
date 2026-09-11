@@ -46,16 +46,16 @@ def test_good_addresses_survive_invalid_sibling_and_empty_rows():
 
 
 def test_limit_applies_after_splitting():
-    emails = ";".join(f"c{i}@example.com" for i in range(10000))
+    emails = ";".join(f"c{i}@example.com" for i in range(70000))
     contacts, errors = prepare_import_rows([{"email": emails}])
-    assert len(contacts) == 10000 and not errors
-    with pytest.raises(AppError, match="10000"):
+    assert len(contacts) == 70000 and not errors
+    with pytest.raises(AppError, match="70000"):
         prepare_import_rows([{"email": f"{emails};extra@example.com"}])
 
 
-def test_bulk_contact_schema_accepts_10000_and_rejects_10001():
-    contacts = [{"email": f"c{i}@example.com"} for i in range(10000)]
-    assert len(BulkContactsCreate(contacts=contacts).contacts) == 10000
+def test_bulk_contact_schema_accepts_70000_and_rejects_70001():
+    contacts = [{"email": f"c{i}@example.com"} for i in range(70000)]
+    assert len(BulkContactsCreate(contacts=contacts).contacts) == 70000
     with pytest.raises(ValidationError) as exc:
         BulkContactsCreate(contacts=[*contacts, {"email": "extra@example.com"}])
     assert exc.value.errors()[0]["type"] == "too_long"

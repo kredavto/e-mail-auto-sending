@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guessMapping, MAX_IMPORT_CONTACTS, MAX_IMPORT_FILE_BYTES, parseCsv, prepareContacts, splitEmailCell, validateContactFileSize } from "./contact-import";
+import { contactImportBatches, guessMapping, IMPORT_BATCH_BYTES, MAX_IMPORT_CONTACTS, MAX_IMPORT_FILE_BYTES, parseCsv, prepareContacts, splitEmailCell, validateContactFileSize } from "./contact-import";
 import { contactVariables, safeCtaUrl, type Contact } from "./mailing";
 
 describe("contact import", () => {
@@ -35,8 +35,23 @@ describe("contact import", () => {
   });
   it("enforces the contact limit after expansion without silently truncating", () => {
     const emails = Array.from({ length: MAX_IMPORT_CONTACTS }, (_, i) => `c${i}@example.com`);
-    expect(prepareContacts([[emails.join(";")]], ["email"], "", 2).contacts).toHaveLength(10000);
-    expect(() => prepareContacts([[`${emails.join(";")};extra@example.com`]], ["email"], "", 2)).toThrow("10000");
+    expect(prepareContacts([[emails.join(";")]], ["email"], "", 2).contacts).toHaveLength(70000);
+    expect(() => prepareContacts([[`${emails.join(";")};extra@example.com`]], ["email"], "", 2)).toThrow("70000");
+  });
+  it("splits 70000 contacts into bounded batches without losing order or data", () => {
+    const { contacts } = prepareContacts(Array.from({ length: 70000 }, (_, i) => [`c${i}@example.com`]), ["email"], "", 2);
+    const batches = contactImportBatches(contacts);
+    expect(batches).toHaveLength(140);
+    expect(batches.every(batch => batch.count === 500 && new TextEncoder().encode(batch.body).length <= IMPORT_BATCH_BYTES)).toBe(true);
+    expect(batches.flatMap(batch => JSON.parse(batch.body).contacts)).toEqual(contacts);
+  });
+  it("bounds UTF-8 request bytes including custom fields and rejects an oversized contact upfront", () => {
+    const { contacts } = prepareContacts([["a@example.com;b@example.com;c@example.com", "Я".repeat(150000)]], ["email", "custom:notes"], "", 2);
+    const batches = contactImportBatches(contacts);
+    expect(batches).toHaveLength(3);
+    expect(batches.every(batch => new TextEncoder().encode(batch.body).length <= IMPORT_BATCH_BYTES)).toBe(true);
+    expect(() => contactImportBatches([...contacts, { ...contacts[0], custom_fields: { notes: "Я".repeat(IMPORT_BATCH_BYTES) } }])).toThrow("импорт не начат");
+    expect(contactImportBatches([])).toEqual([]);
   });
   it("rejects invalid individual addresses but preserves Unicode domains", () => {
     const result = prepareContacts([["a..b@example.com;.name@example.com;a@-example.com;info@пример.рф"]], ["email"], "", 2);

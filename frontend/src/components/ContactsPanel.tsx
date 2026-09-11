@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import { cellText, guessMapping, importFields, MAX_IMPORT_CONTACTS, MAX_IMPORT_FILE_MB, parseCsv, prepareContacts, validateContactFileSize } from "../lib/contact-import";
+import { cellText, contactImportBatches, guessMapping, importFields, MAX_IMPORT_CONTACTS, MAX_IMPORT_FILE_MB, parseCsv, prepareContacts, validateContactFileSize, type ImportedContact } from "../lib/contact-import";
 import type { Contact, ContactPage } from "../lib/mailing";
 
 type ImportResult = { created: number; skipped: number; errors: string[] };
@@ -15,6 +15,9 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [completed, setCompleted] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const upload = useRef<{ contacts: ImportedContact[]; workspaceId: string; batches: ReturnType<typeof contactImportBatches>; next: number; processed: number; report: ImportResult } | null>(null);
   const [page, setPage] = useState(1);
   const [encoding, setEncoding] = useState("auto");
   const request = useRef(0);
@@ -27,7 +30,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
   }, [rows, headerRow, mapping, file]);
   async function loadFile(nextFile: File, nextSheet = "", nextEncoding = encoding) {
     const ticket = ++request.current;
-    setBusy(true); setError(""); setResult(null); setRows([]); setMapping([]); setFile(nextFile);
+    setBusy(true); setError(""); setResult(null); setCompleted(false); setProgress(0); upload.current = null; setRows([]); setMapping([]); setFile(nextFile);
     try {
       validateContactFileSize(nextFile.size);
       let parsed: string[][];
@@ -50,6 +53,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
         if (ticket !== request.current) return;
         setSheets([]); setSheet("");
       } else throw new Error("Поддерживаются .xlsx и .csv. Старый .xls сохраните в Excel как .xlsx.");
+      while (parsed.length && parsed[parsed.length - 1].every(value => !value.trim())) parsed.pop();
       if (parsed.length > MAX_IMPORT_CONTACTS + 1 || parsed.some(row => row.length > 100)) throw new Error(`Лимит: ${MAX_IMPORT_CONTACTS} строк контактов и 100 колонок. Разделите файл.`);
       if (parsed.length < 2) throw new Error("Нужны строка заголовков и хотя бы одна строка данных.");
       setRows(parsed); setHeaderRow(1); setMapping(guessMapping(parsed[0]));
@@ -57,21 +61,38 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
     finally { if (ticket === request.current) setBusy(false); }
   }
   async function importContacts() {
-    if (busy || !workspaceId || prepared.problem || !prepared.contacts.length || result) return;
-    setBusy(true); setError(""); setResult(null);
+    if (busy || !workspaceId || prepared.problem || !prepared.contacts.length || (completed && result)) return;
+    setBusy(true); setError(""); setCompleted(false);
     try {
-      const report = await api<ImportResult>("/contacts/bulk", { workspaceId, method: "POST", body: JSON.stringify({ contacts: prepared.contacts }) });
-      setResult(report);
+      if (upload.current?.contacts !== prepared.contacts || upload.current.workspaceId !== workspaceId) {
+        upload.current = null; setResult(null); setProgress(0);
+        upload.current = { contacts: prepared.contacts, workspaceId, batches: contactImportBatches(prepared.contacts), next: 0, processed: 0, report: { created: 0, skipped: 0, errors: [] } };
+      }
+      const run = upload.current;
+      while (run.next < run.batches.length) {
+        const batch = run.batches[run.next];
+        const report = await api<ImportResult>("/contacts/bulk", { workspaceId, method: "POST", body: batch.body });
+        run.report = { created: run.report.created + report.created, skipped: run.report.skipped + report.skipped, errors: [...run.report.errors, ...report.errors.map(message => `Порция ${run.next + 1}: ${message}`)] };
+        run.next++; run.processed += batch.count;
+        setProgress(run.processed); setResult(run.report);
+      }
+      setCompleted(true);
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "Ошибка импорта.";
+      const run = upload.current;
+      setError(`${message} Подтверждено создано: ${run?.report.created ?? 0}. ${run ? "Нажмите импорт ещё раз, чтобы продолжить с прерванной порции. При потере ответа сервера часть этой порции могла сохраниться; существующие email будут пропущены." : "Контакты не отправлены."}`);
+    } finally {
       await client.invalidateQueries({ queryKey: ["contacts", workspaceId] });
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Ошибка импорта. При повторе существующие email будут пропущены."); }
-    finally { setBusy(false); }
+      setBusy(false);
+    }
   }
   return <div className="space-y-5">
     <section className="panel space-y-4"><h2 className="font-display text-2xl font-bold">Загрузить базу контактов</h2>
       <p className="hint">Excel .xlsx или CSV · до {MAX_IMPORT_FILE_MB} МБ / {MAX_IMPORT_CONTACTS} контактов после разделения email. До {MAX_IMPORT_CONTACTS} строк данных и отдельная строка заголовков. В одной ячейке можно указать несколько адресов через запятую, точку с запятой, пробел или перенос строки. Каждый email станет отдельным контактом с данными исходной строки. Файл разбирается в браузере; сохранение — после подтверждения. Также действуют лимиты вашего тарифа.</p>
+      <p className="hint">Большая база сохраняется порциями с показом прогресса. Не закрывайте вкладку до завершения. При прерывании уже сохранённые контакты остаются в базе; повторное нажатие импорта в этой вкладке продолжит обработку.</p>
       <label className="field">Файл контактов<input type="file" accept=".xlsx,.csv" disabled={busy} onChange={e => { const selected = e.target.files?.[0]; if (selected) void loadFile(selected); }} /></label>
       {error && <p role="alert" className="error-box">{error}</p>}
-      {busy && <p role="status">Обрабатываем…</p>}
+      {busy && <p role="status">{upload.current ? `Сохранение: ${progress} из ${prepared.contacts.length}. Не закрывайте вкладку.` : "Обрабатываем…"}</p>}
       {!!rows.length && <>
         <div className="flex flex-wrap gap-3">
           {!!sheets.length && <label className="field">Лист Excel<select disabled={busy} value={sheet} onChange={e => file && void loadFile(file, e.target.value)}>{sheets.map(name => <option key={name}>{name}</option>)}</select></label>}
@@ -89,7 +110,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
         {!!prepared.expandedRows && <p className="hint">Строк с несколькими email: {prepared.expandedRows}. Каждый уникальный корректный адрес показан отдельным контактом; остальные данные строки сохранены. Для дублей используются данные первого корректного вхождения.</p>}
         {!!prepared.errors.length && <details><summary>Показать ошибки строк</summary><ul className="max-h-48 overflow-auto text-sm">{prepared.errors.map(message => <li key={message}>{message}</li>)}</ul></details>}
         {!!prepared.contacts.length && <div className="overflow-x-auto"><table className="data-table"><caption className="mb-2 text-left font-semibold">Предпросмотр — первые 5 контактов</caption><thead><tr><th>Email</th><th>Ф.И.О.</th><th>Организация</th><th>Должность</th><th>Доп. поля</th></tr></thead><tbody>{prepared.contacts.slice(0, 5).map(contact => <tr key={contact.email}><td>{contact.email}</td><td>{contact.full_name}</td><td>{contact.company}</td><td>{contact.position}</td><td>{Object.entries(contact.custom_fields).map(([key, value]) => `${key}: ${value}`).join(" · ")}</td></tr>)}</tbody></table></div>}
-        <button className="button primary" onClick={importContacts} disabled={busy || !workspaceId || !prepared.contacts.length || !!prepared.problem || !!result}>Импортировать {prepared.contacts.length} контактов</button>
+        <button className="button primary" onClick={importContacts} disabled={busy || !workspaceId || !prepared.contacts.length || !!prepared.problem || (completed && !!result)}>Импортировать {prepared.contacts.length} контактов</button>
         {!workspaceId && <p className="hint">Для сохранения войдите и выберите рабочее пространство выше.</p>}
         {result && <div role="status" className="success-box">Создано: {result.created}. Уже были в базе: {result.skipped}. Ошибки сервера: {result.errors.length}.{!!result.errors.length && <ul>{result.errors.map((message, index) => <li key={index}>{message}</li>)}</ul>}</div>}
       </>}

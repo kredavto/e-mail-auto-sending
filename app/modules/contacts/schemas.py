@@ -4,7 +4,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 from app.shared.dto import ORMModel
 
-MAX_IMPORT_CONTACTS = 10000
+MAX_IMPORT_CONTACTS = 70000
 
 
 class ContactBase(BaseModel):

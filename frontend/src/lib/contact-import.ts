@@ -41,7 +41,31 @@ export function parseCsv(text: string): string[][] {
   return result.data.map(row => row.map(cellText));
 }
 export type ImportedContact = { email: string; full_name: string; company: string; position: string; source: string; tags: string[]; custom_fields: Record<string, string>; [key: string]: unknown };
-export const MAX_IMPORT_CONTACTS = 10000;
+export const MAX_IMPORT_CONTACTS = 70000;
+export const IMPORT_BATCH_SIZE = 500;
+export const IMPORT_BATCH_BYTES = 512 * 1024;
+export function contactImportBatches(contacts: ImportedContact[]): { body: string; count: number }[] {
+  const batches: { body: string; count: number }[] = [];
+  const encoder = new TextEncoder();
+  const overhead = encoder.encode('{"contacts":[]}').length;
+  let items: string[] = [];
+  let bytes = overhead;
+  const flush = () => {
+    if (items.length) batches.push({ body: `{"contacts":[${items.join(",")}]}`, count: items.length });
+    items = []; bytes = overhead;
+  };
+  // Validate all entries before any request: no silent truncation of large custom fields.
+  for (const [index, contact] of contacts.entries()) {
+    const json = JSON.stringify(contact);
+    const size = encoder.encode(json).length;
+    if (size + overhead > IMPORT_BATCH_BYTES) throw new Error(`Контакт ${index + 1}: слишком большой объём данных (больше 512 КБ). Сократите дополнительные поля; импорт не начат.`);
+    if (items.length >= IMPORT_BATCH_SIZE || bytes + size + (items.length ? 1 : 0) > IMPORT_BATCH_BYTES) flush();
+    bytes += size + (items.length ? 1 : 0);
+    items.push(json);
+  }
+  flush();
+  return batches;
+}
 export function splitEmailCell(value: string): string[] {
   return value.split(/[,;\s]+/u).map(email => email.trim().toLowerCase()).filter(Boolean);
 }
