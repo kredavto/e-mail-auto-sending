@@ -168,8 +168,8 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 px-6 py-4"><span className="hint">Добавляйте сколько нужно CTA с разными ссылками. Перетаскивайте за ⠿ в нужное место текста. Или нажмите на кнопку в письме и используйте «Выше / Ниже» на панели. Переход по ссылкам — в предпросмотре.</span><button onClick={compile} disabled={checking || saving || uploading || showCta || !!typeIssue} className="button primary">{checking ? "Проверяем…" : "Проверить письмо"}</button></div>
       </section>
-      <aside className="rounded-2xl bg-ink p-6 text-white"><p className="text-xs font-semibold uppercase tracking-[.2em] text-acid">Контроль качества</p><div className="my-7 font-display text-6xl font-bold">{quality?.score ?? "—"}<span className="text-lg text-white/45"> / 100</span></div>
-        {quality ? <div className="space-y-3">{[...quality.issues, ...quality.warnings, ...quality.suggestions].map((message, index) => <p key={index} className="rounded-lg border border-white/15 p-3 text-sm">{message}</p>)}<p className="text-sm text-white/60">{quality.words_count} слов</p></div> : <p className="text-sm text-white/60">Проверьте письмо, чтобы увидеть оценку и HTML-предпросмотр.</p>}
+      <aside className="rounded-2xl bg-ink p-6 text-white"><p className="text-xs font-semibold uppercase tracking-[.2em] text-acid">Контроль качества</p><div className="my-7 font-display text-6xl font-bold">{quality?.score ?? "—"}<span className="text-lg text-white/75"> / 100</span></div>
+        {quality ? <div className="space-y-3">{[...quality.issues, ...quality.warnings, ...quality.suggestions].map((message, index) => <p key={index} className="rounded-lg border border-white/15 p-3 text-sm">{message}</p>)}<p className="text-sm text-white/80">{quality.words_count} слов</p></div> : <p className="text-sm text-white/80">Проверьте письмо, чтобы увидеть оценку и HTML-предпросмотр.</p>}
         {result && <p className="mt-5 break-words font-mono text-xs text-acid">{result.variables.join(" · ")}</p>}
       </aside>
     </div>
