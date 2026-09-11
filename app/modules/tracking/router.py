@@ -40,11 +40,26 @@ async def click(
     return RedirectResponse(destination, status_code=302)
 
 
+@router.get("/unsubscribe/preview", include_in_schema=False)
+async def unsubscribe_preview() -> Response:
+    return Response(
+        "Это предпросмотр ссылки отписки. В отправленном письме ссылка будет персональной. "
+        "Сейчас никто не отписан от рассылки.",
+        media_type="text/plain",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @router.api_route("/unsubscribe/{message_id}", methods=["GET", "POST"], include_in_schema=False)
 async def unsubscribe(message_id: UUID, db: AsyncSession = Depends(get_db)) -> Response:
     accepted = await TrackingService(db).unsubscribe(message_id)
     text = "Вы отписаны от рассылки" if accepted else "Ссылка недействительна"
-    return Response(text, status_code=200 if accepted else 404, media_type="text/plain")
+    return Response(
+        text,
+        status_code=200 if accepted else 404,
+        media_type="text/plain",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.post("/tracking/meeting/{contact_id}", response_model=MessageResponse)

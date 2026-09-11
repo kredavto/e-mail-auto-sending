@@ -141,6 +141,7 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
           {ctaError && <p role="alert" className="error-box">{ctaError}</p>}<button className="button primary">Вставить / обновить CTA</button> <button type="button" className="button" onClick={() => setShowCta(false)}>Отмена</button>
         </form>}
         <EditorContent editor={editor} className="editor-content px-7 py-7" />
+        <div className="px-7 pb-6"><a href={`${import.meta.env.VITE_API_URL ?? "/api/v1"}/unsubscribe/preview`} target="_blank" rel="noopener noreferrer" className="text-xs text-stone-500 underline">Отписаться от рассылки</a><p className="hint mt-2">Добавляется автоматически в конец каждого письма. Персональная ссылка создаётся при отправке; здесь — безопасный предпросмотр.</p></div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 px-6 py-4"><span className="hint">Переход по CTA доступен в предпросмотре ниже.</span><button onClick={compile} disabled={checking || saving || uploading || !!typeIssue} className="button primary">{checking ? "Проверяем…" : "Проверить письмо"}</button></div>
       </section>
       <aside className="rounded-2xl bg-ink p-6 text-white"><p className="text-xs font-semibold uppercase tracking-[.2em] text-acid">Контроль качества</p><div className="my-7 font-display text-6xl font-bold">{quality?.score ?? "—"}<span className="text-lg text-white/45"> / 100</span></div>

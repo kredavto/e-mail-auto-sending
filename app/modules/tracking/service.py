@@ -79,7 +79,7 @@ class TrackingService:
         if not message or not message.contact_id:
             return False
         contact = await self.db.get(Contact, message.contact_id)
-        if not contact:
+        if not contact or contact.workspace_id != message.workspace_id:
             return False
         contact.is_unsubscribed = True
         contact.status = "unsubscribed"

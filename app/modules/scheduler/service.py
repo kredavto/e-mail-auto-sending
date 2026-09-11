@@ -50,7 +50,7 @@ class SchedulerService:
     def should_stop(contact: Contact, conditions: dict[str, bool]) -> bool:
         return bool(
             (conditions.get("replied") and contact.has_replied)
-            or (conditions.get("unsubscribed") and contact.is_unsubscribed)
+            or contact.is_unsubscribed
             or (conditions.get("bounced") and contact.status == "bounced")
             or (conditions.get("meeting_booked") and contact.status == "meeting_booked")
         )

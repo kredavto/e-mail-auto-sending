@@ -23,6 +23,7 @@ from app.modules.sender.models import EmailMessage
 from app.modules.sender.repository import MessageRepository
 from app.modules.sender.schemas import SendEmailRequest
 from app.modules.warmup.models import WarmupPlan
+from app.shared.email_footer import with_unsubscribe_footer, with_unsubscribe_text
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class SenderService:
         message["To"] = str(data.to)
         message["Subject"] = data.subject
         message["X-App-Message-ID"] = str(message_id)
-        unsubscribe = f"{self.settings.public_base_url}/api/v1/unsubscribe/{message_id}"
+        unsubscribe = f"{self.settings.public_base_url.rstrip('/')}/api/v1/unsubscribe/{message_id}"
         message["List-Unsubscribe"] = f"<{unsubscribe}>"
         message["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
         pixel = (
@@ -52,14 +53,20 @@ class SenderService:
             'width="1" height="1" alt="" style="display:none">'
         )
         tracked_html = self._track_links(data.html, message_id)
-        message.set_content(data.text)
-        message.add_alternative(tracked_html + pixel, subtype="html")
+        message.set_content(with_unsubscribe_text(data.text, unsubscribe))
+        message.add_alternative(
+            with_unsubscribe_footer(tracked_html, unsubscribe) + pixel, subtype="html"
+        )
         return message
 
     def _track_links(self, html_body: str, message_id: UUID) -> str:
         pattern = re.compile(r'href=(["\'])(https?://[^"\']+)\1', re.IGNORECASE)
 
         def replace(match: re.Match[str]) -> str:
+            if match.group(2).startswith(
+                self.settings.public_base_url.rstrip("/") + "/api/v1/unsubscribe/"
+            ):
+                return match.group()  # An opt-out must never be counted as a marketing click.
             encoded = base64.urlsafe_b64encode(match.group(2).encode()).decode().rstrip("=")
             tracking_url = (
                 f"{self.settings.public_base_url}/api/v1/track/click/{message_id}?url={encoded}"
@@ -121,7 +128,7 @@ class SenderService:
             EmailMessage(
                 workspace_id=self.workspace_id,
                 campaign_id=data.campaign_id,
-                contact_id=data.contact_id,
+                contact_id=contact.id if contact else data.contact_id,
                 recipient_email=str(data.to),
                 subject=data.subject,
             )
@@ -254,6 +261,16 @@ class SenderService:
             )
             if not contact or contact.email.casefold() != str(data.to).casefold():
                 raise NotFoundError("Контакт не найден")
+        else:
+            existing = await self.repo.db.scalar(
+                select(Contact).where(
+                    Contact.workspace_id == self.workspace_id,
+                    Contact.email == str(data.to).lower(),
+                )
+            )
+            contact = existing if isinstance(existing, Contact) else None
+        if contact and contact.is_unsubscribed is True:
+            raise AppError("Получатель отписался от рассылки. Отправка запрещена.")
         if campaign and contact:
             linked = await self.repo.db.scalar(
                 select(CampaignContact.id).where(

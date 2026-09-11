@@ -9,6 +9,7 @@ from jinja2 import Environment, StrictUndefined, select_autoescape
 
 from app.config import get_settings
 from app.core.exceptions import AppError
+from app.shared.email_footer import unsubscribe_footer, with_unsubscribe_text
 
 VARIABLE_RE = re.compile(r"{{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}")
 ALLOWED_TAGS = [
@@ -99,6 +100,8 @@ class EditorService:
             css_sanitizer=CSS_SANITIZER,
             strip=True,
         )
+        preview_url = get_settings().public_base_url.rstrip("/") + "/api/v1/unsubscribe/preview"
+        clean += unsubscribe_footer(preview_url)
         wrapped = (
             '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
             'style="background:#f4f2ed;width:100%">'
@@ -122,13 +125,10 @@ class EditorService:
         if len(text) > 1500:
             warnings.append("Письмо длиннее 1500 символов")
             score -= 15
-        if "unsubscribe" not in body.casefold():
-            warnings.append("Нет блока отписки")
-            score -= 15
         if not any(node.get("type") == "ctaButton" for node in nodes if isinstance(node, dict)):
             warnings.append("Нет CTA-кнопки")
             score -= 10
-        return wrapped, text, variables, max(0, score), warnings
+        return wrapped, with_unsubscribe_text(text, preview_url), variables, max(0, score), warnings
 
     def preview(self, state: dict[str, object], variables: dict[str, str]) -> str:
         compiled, _, _, _, _ = self.compile(state)
@@ -237,8 +237,7 @@ class EditorService:
                 f'background:#f7f8f3">{inner}</div>'
             )
         if node_type == "unsubscribeBlock":
-            content = inner or "Чтобы отписаться, нажмите unsubscribe"
-            return f'<p style="margin-top:24px;color:#69736b;font-size:12px">{content}</p>'
+            return ""  # Replaced with one mandatory footer after all content.
         if node_type == "hardBreak":
             return "<br>"
         return inner
@@ -247,6 +246,8 @@ class EditorService:
         chunks: list[str] = []
         for item in nodes:
             if not isinstance(item, dict):
+                continue
+            if item.get("type") == "unsubscribeBlock":
                 continue
             if item.get("type") == "text":
                 chunks.append(str(item.get("text", "")))
