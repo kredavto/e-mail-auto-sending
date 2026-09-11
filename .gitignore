@@ -16,6 +16,7 @@ frontend/*.tsbuildinfo
 uploads/
 .vercel/
 frontend/test-results/
+frontend/test-results-premium/
 frontend/playwright-report/
 .codex-release/
 

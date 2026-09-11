@@ -3,7 +3,7 @@ export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
-      colors: { ink: "#142019", acid: "#d8f04c", paper: "#f2f0e9", clay: "#d56842" },
+      colors: { ink: "#202630", acid: "#e8d1a2", paper: "#f6f5f1", clay: "#967039" },
       fontFamily: { display: ["Manrope", "sans-serif"], body: ["IBM Plex Sans", "sans-serif"] },
     },
   },
