@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { ContactPage, MailTemplate } from "../lib/mailing";
+import { SenderEmailField } from "./SenderEmailField";
 
 export function CampaignComposer({ workspaceId, templates, onCreated }: { workspaceId: string; templates: MailTemplate[]; onCreated: (id: string) => void }) {
   const [name, setName] = useState("");
@@ -21,19 +22,20 @@ export function CampaignComposer({ workspaceId, templates, onCreated }: { worksp
   const controller = useRef<AbortController | null>(null);
   useEffect(() => { alive.current = true; return () => { alive.current = false; controller.current?.abort(); }; }, []);
   const contacts = useQuery({ queryKey: ["campaign-contacts", workspaceId, page, search], queryFn: ({ signal }) => api<ContactPage>(`/assistant/contacts?page=${page}&page_size=25&search=${encodeURIComponent(search)}`, { workspaceId, signal }) });
+  const campaigns = useQuery({ queryKey: ["campaigns", workspaceId], enabled: !!workspaceId, queryFn: ({ signal }) => api<{ sender_email: string }[]>("/campaigns", { workspaceId, signal }) });
   async function submit(event: React.FormEvent) {
     event.preventDefault(); if (busy || !consent || !selected.size) return;
     setBusy(true); setError(""); controller.current = new AbortController();
     try {
-      const result = await api<{ id: string }>("/assistant/campaigns", { workspaceId, method: "POST", signal: controller.current.signal, body: JSON.stringify({ name, product_name: product, sender_email: sender, sender_name: senderName, schedule_start: `${start}:00+03:00`, template_ids: steps, contact_ids: [...selected], delay_days: delay, consent_confirmed: true }) });
+      const result = await api<{ id: string }>("/assistant/campaigns", { workspaceId, method: "POST", signal: controller.current.signal, body: JSON.stringify({ name, product_name: product, sender_email: sender.trim().toLowerCase(), sender_name: senderName, schedule_start: `${start}:00+03:00`, template_ids: steps, contact_ids: [...selected], delay_days: delay, consent_confirmed: true }) });
       if (alive.current) onCreated(result.id);
     } catch (reason) { if (alive.current) setError(reason instanceof Error ? reason.message : "Не удалось создать рассылку"); }
     finally { if (alive.current) setBusy(false); }
   }
   return <form onSubmit={submit} className="space-y-4 rounded-xl border border-ink/20 p-4" aria-label="Новая рассылка">
     <p>Создаётся только черновик. Отправка не начнётся без отдельного запуска.</p>
-    <fieldset disabled={busy} className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2"><label className="field">Название рассылки<input required minLength={2} maxLength={200} value={name} onChange={e => setName(e.target.value)} /></label><label className="field">Продукт / услуга<input required minLength={2} maxLength={200} value={product} onChange={e => setProduct(e.target.value)} /></label><label className="field">Email отправителя<input type="email" required value={sender} onChange={e => setSender(e.target.value)} /></label><label className="field">Имя отправителя<input required maxLength={100} value={senderName} onChange={e => setSenderName(e.target.value)} /></label><label className="field">Первое письмо (МСК)<input type="datetime-local" required value={start} onChange={e => setStart(e.target.value)} /></label><label className="field">Дней между повторными письмами<input type="number" min={1} max={30} value={delay} onChange={e => setDelay(Number(e.target.value))} /></label></div>
+    <fieldset disabled={busy} className="min-w-0 space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2"><label className="field">Название рассылки<input required minLength={2} maxLength={200} value={name} onChange={e => setName(e.target.value)} /></label><label className="field">Продукт / услуга<input required minLength={2} maxLength={200} value={product} onChange={e => setProduct(e.target.value)} /></label><SenderEmailField value={sender} onChange={setSender} addresses={(campaigns.data ?? []).map(campaign => campaign.sender_email)} loading={campaigns.isLoading} error={campaigns.error?.message} /><label className="field">Имя отправителя<input required maxLength={100} value={senderName} onChange={e => setSenderName(e.target.value)} /></label><label className="field">Первое письмо (МСК)<input type="datetime-local" required value={start} onChange={e => setStart(e.target.value)} /></label><label className="field">Дней между повторными письмами<input type="number" min={1} max={30} value={delay} onChange={e => setDelay(Number(e.target.value))} /></label></div>
       {steps.map((step, index) => <div className="flex items-end gap-2" key={index}><label className="field grow">Письмо {index + 1}<select required value={step} onChange={e => setSteps(previous => previous.map((s, i) => i === index ? e.target.value : s))}><option value="">Выберите проверенный шаблон</option>{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>{index > 0 && <button type="button" className="button" onClick={() => setSteps(previous => previous.filter((_, i) => i !== index))}>Убрать шаг {index + 1}</button>}</div>)}
       <button type="button" className="button" disabled={steps.length >= 5} onClick={() => setSteps(previous => [...previous, ""])}>Добавить повторное письмо</button>
       <p className="hint">Первое письмо — в указанное время. Повторные — по будням с 09:00 до 18:00 МСК. После ответа, отписки или возврата цепочка останавливается.</p>
