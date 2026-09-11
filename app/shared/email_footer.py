@@ -5,17 +5,23 @@ FOOTER_RE = re.compile(r'<p\s+data-unsubscribe-footer="true"[^>]*>.*?</p>', re.I
 LABEL = "Отписаться от рассылки"
 
 
-def unsubscribe_footer(url: str) -> str:
+def unsubscribe_footer(url: str, color: str = "#69736b") -> str:
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+        color = "#69736b"
     return (
-        '<p data-unsubscribe-footer="true" style="margin:24px 0 0;'
-        'font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#69736b">'
+        f'<p data-unsubscribe-footer="true" data-footer-color="{color}" style="margin:24px 0 0;'
+        f'font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:{color}">'
         f'<a href="{html.escape(url, quote=True)}" target="_blank" rel="noopener noreferrer" '
-        f'style="font-size:12px;color:#69736b;text-decoration:underline">{LABEL}</a></p>'
+        f'style="font-size:12px;color:{color};text-decoration:underline">{LABEL}</a></p>'
     )
 
 
 def with_unsubscribe_footer(body: str, url: str) -> str:
-    footer = unsubscribe_footer(url)
+    existing = FOOTER_RE.search(body)
+    color = (
+        re.search(r'data-footer-color="(#[0-9a-fA-F]{6})"', existing.group()) if existing else None
+    )
+    footer = unsubscribe_footer(url, color.group(1) if color else "#69736b")
     if FOOTER_RE.search(body):
         # Keep the compiler's footer inside the email card; collapse duplicate system footers.
         first = True

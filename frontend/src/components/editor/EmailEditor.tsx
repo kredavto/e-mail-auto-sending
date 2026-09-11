@@ -2,13 +2,15 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { closeHistory } from "@tiptap/pm/history";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { baseVariables, contactVariables, generalLetterIssue, getLetterType, initialDocument, interpolate, letterTypes, safeCtaUrl, stages, withLetterType, type Contact, type LetterType, type MailTemplate, type Stage } from "../../lib/mailing";
 import { CaseStudyBlock, CTAButton, EmailImage, EmailVideo, SignatureBlock, UnsubscribeBlock, Variable } from "./extensions";
 import { ImageUpload } from "./ImageUpload";
 import { ctaDestination, moveCta } from "./cta-movement";
+import { EmailStylePanel } from "./EmailStylePanel";
+import { emailFonts, getEmailStyle, readableText, withEmailStyle } from "../../lib/email-style";
 
 type CompileResult = { html: string; text: string; variables: string[]; quality_score: number; warnings: string[] };
 type QualityResult = { score: number; issues: string[]; warnings: string[]; suggestions: string[]; words_count: number };
@@ -19,6 +21,7 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
   const [name, setName] = useState(template?.name ?? "");
   const [stage, setStage] = useState<Stage>(template?.category ?? "first_contact");
   const [letterType, setLetterType] = useState<LetterType>(() => getLetterType(template?.editor_state));
+  const [emailStyle, setEmailStyle] = useState(() => getEmailStyle(template?.editor_state));
   const [result, setResult] = useState<CompileResult | null>(null);
   const [quality, setQuality] = useState<QualityResult | null>(null);
   const [preview, setPreview] = useState("");
@@ -62,7 +65,7 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
     if (!editor || (letterType === "general" && generalLetterIssue(editor.getJSON(), subject))) return;
     setChecking(true); setError(""); setPreview("");
     const currentRevision = revision.current;
-    const state = withLetterType(editor.getJSON(), letterType);
+    const state = withEmailStyle(withLetterType(editor.getJSON(), letterType), emailStyle);
     try {
       const compiled = await api<CompileResult>("/editor/compile", { method: "POST", body: JSON.stringify({ editor_state: state }) });
       const variables: Record<string, string> = letterType === "personalized" && contact ? contactVariables(contact, productName) : { product_name: productName };
@@ -85,7 +88,7 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
     if (!name.trim() || !subject.trim()) { setError("Заполните название шаблона и тему письма."); return; }
     setSaving(true); setError(""); setNotice("");
     try {
-      const saved = await api<MailTemplate>(template && !copy ? `/templates/${template.id}` : "/templates", { workspaceId, method: template && !copy ? "PATCH" : "POST", body: JSON.stringify({ name: name.trim(), category: stage, subject_template: subject, editor_state: withLetterType(editor.getJSON(), letterType) }) });
+      const saved = await api<MailTemplate>(template && !copy ? `/templates/${template.id}` : "/templates", { workspaceId, method: template && !copy ? "PATCH" : "POST", body: JSON.stringify({ name: name.trim(), category: stage, subject_template: subject, editor_state: withEmailStyle(withLetterType(editor.getJSON(), letterType), emailStyle) }) });
       onDirty(false); onSaved(saved); setNotice(`Шаблон сохранён на сервере · версия ${saved.version}`);
       await client.invalidateQueries({ queryKey: ["templates", workspaceId] });
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Ошибка сохранения"); }
@@ -131,6 +134,7 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
     </section>
     {error && <p role="alert" className="error-box">{error}</p>}{notice && <p role="status" className="success-box">{notice}</p>}
     {typeIssue && <p role="alert" className="error-box">{typeIssue}</p>}
+    <EmailStylePanel value={emailStyle} disabled={saving || uploading || showCta} onChange={next => { setEmailStyle(next); changed(); }} />
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <section className="overflow-hidden rounded-2xl border border-ink/10 bg-white shadow-[0_18px_60px_rgba(20,32,25,.08)]">
         <div className="border-b border-ink/10 px-6 py-5"><label className="field">Тема письма<input value={subject} maxLength={255} disabled={saving} onChange={e => { setSubject(e.target.value); changed(); }} /></label></div>
@@ -158,8 +162,10 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
           <p className="hint">{ctaTarget?.edit ? "Изменяется только выбранная кнопка." : "Добавляется новая кнопка в позицию курсора или после выделенной кнопки. У каждой кнопки своя ссылка."}</p>
           {ctaError && <p role="alert" className="error-box">{ctaError}</p>}<button className="button primary" disabled={saving || uploading}>{ctaTarget?.edit ? "Сохранить изменения кнопки" : "Вставить CTA"}</button> <button type="button" className="button" onClick={() => setShowCta(false)}>Отмена</button>
         </form>}
-        <EditorContent editor={editor} className="editor-content px-7 py-7" />
-        <div className="px-7 pb-6"><a href={`${import.meta.env.VITE_API_URL ?? "/api/v1"}/unsubscribe/preview`} target="_blank" rel="noopener noreferrer" className="text-xs text-stone-500 underline">Отписаться от рассылки</a><p className="hint mt-2">Добавляется автоматически в конец каждого письма. Персональная ссылка создаётся при отправке; здесь — безопасный предпросмотр.</p></div>
+        <div className="email-canvas" style={{ background: emailStyle.background, color: readableText(emailStyle.background), fontFamily: emailFonts[emailStyle.font], fontSize: emailStyle.fontSize, "--email-button-bg": emailStyle.buttonBackground, "--email-button-text": readableText(emailStyle.buttonBackground), "--email-button-radius": `${emailStyle.radius}px` } as CSSProperties}>
+          <EditorContent editor={editor} className="editor-content px-7 py-7" />
+          <div className="px-7 pb-6"><a href={`${import.meta.env.VITE_API_URL ?? "/api/v1"}/unsubscribe/preview`} target="_blank" rel="noopener noreferrer" className="text-xs underline" style={{ color: "inherit" }}>Отписаться от рассылки</a><p className="mt-2 text-sm opacity-80">Добавляется автоматически в конец каждого письма. Персональная ссылка создаётся при отправке; здесь — безопасный предпросмотр.</p></div>
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 px-6 py-4"><span className="hint">Добавляйте сколько нужно CTA с разными ссылками. Перетаскивайте за ⠿ в нужное место текста. Или нажмите на кнопку в письме и используйте «Выше / Ниже» на панели. Переход по ссылкам — в предпросмотре.</span><button onClick={compile} disabled={checking || saving || uploading || showCta || !!typeIssue} className="button primary">{checking ? "Проверяем…" : "Проверить письмо"}</button></div>
       </section>
       <aside className="rounded-2xl bg-ink p-6 text-white"><p className="text-xs font-semibold uppercase tracking-[.2em] text-acid">Контроль качества</p><div className="my-7 font-display text-6xl font-bold">{quality?.score ?? "—"}<span className="text-lg text-white/45"> / 100</span></div>

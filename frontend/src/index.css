@@ -27,4 +27,8 @@ button { font: inherit; }
 }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid #60780e; outline-offset: 3px; }
 .ProseMirror-selectednode[data-cta] { outline: 2px solid #142019; outline-offset: 3px; }
+.email-canvas .tiptap h2 { font-family: inherit; }
+.email-canvas .tiptap .is-empty::before { color: inherit; opacity: .6; }
+.email-canvas [data-block="caseStudyBlock"] { background: transparent; border-color: var(--email-button-bg); }
+.email-canvas [data-block="unsubscribeBlock"] { color: inherit; }
 

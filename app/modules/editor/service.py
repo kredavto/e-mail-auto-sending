@@ -9,6 +9,7 @@ from jinja2 import Environment, StrictUndefined, select_autoescape
 
 from app.config import get_settings
 from app.core.exceptions import AppError
+from app.modules.editor.style import EmailStyle, parse_style
 from app.shared.email_footer import unsubscribe_footer, with_unsubscribe_text
 
 VARIABLE_RE = re.compile(r"{{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}")
@@ -89,9 +90,10 @@ class EditorService:
             )
 
     def compile(self, state: dict[str, object]) -> tuple[str, str, list[str], int, list[str]]:
+        theme = parse_style(state)
         content = state.get("content", [])
         nodes = content if isinstance(content, list) else []
-        body = "".join(self._node(node) for node in nodes if isinstance(node, dict))
+        body = "".join(self._node(node, theme) for node in nodes if isinstance(node, dict))
         clean = bleach.clean(
             body,
             tags=ALLOWED_TAGS,
@@ -101,7 +103,7 @@ class EditorService:
             strip=True,
         )
         preview_url = get_settings().public_base_url.rstrip("/") + "/api/v1/unsubscribe/preview"
-        clean += unsubscribe_footer(preview_url)
+        clean += unsubscribe_footer(preview_url, theme.text)
         wrapped = (
             '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
             'style="background:#f4f2ed;width:100%">'
@@ -109,9 +111,11 @@ class EditorService:
             '<!--[if mso]><table role="presentation" width="640" cellpadding="0" '
             'cellspacing="0"><tr><td><![endif]-->'
             '<table role="presentation" width="640" cellpadding="0" cellspacing="0" '
-            'style="width:100%;max-width:640px;background:#ffffff">'
-            '<tr><td style="padding:32px;font-family:Arial,Helvetica,sans-serif;'
-            f'font-size:16px;line-height:1.55;color:#1c2520">{clean}</td></tr>'
+            f'bgcolor="{theme.background}" style="width:100%;max-width:640px;'
+            f'background:{theme.background}">'
+            f'<tr><td bgcolor="{theme.background}" style="padding:32px;'
+            f'background:{theme.background};font-family:{theme.family};'
+            f'font-size:{theme.font_size}px;line-height:1.55;color:{theme.text}">{clean}</td></tr>'
             "</table><!--[if mso]></td></tr></table><![endif]--></td></tr></table>"
         )
         text = self._text(nodes).strip()
@@ -137,11 +141,11 @@ class EditorService:
         )
         return environment.from_string(compiled).render(**variables)
 
-    def _node(self, node: dict[str, Any]) -> str:
+    def _node(self, node: dict[str, Any], theme: EmailStyle = EmailStyle()) -> str:
         node_type = node.get("type", "")
         attrs = node.get("attrs") or {}
         children = node.get("content") or []
-        inner = "".join(self._node(child) for child in children if isinstance(child, dict))
+        inner = "".join(self._node(child, theme) for child in children if isinstance(child, dict))
         if node_type == "text":
             value = html.escape(str(node.get("text", "")))
             for mark in node.get("marks") or []:
@@ -188,9 +192,12 @@ class EditorService:
             )
             return (
                 '<table role="presentation" cellpadding="0" cellspacing="0" '
-                'style="margin:24px 0"><tr><td style="background:#d6f04a;border-radius:6px">'
+                f'style="margin:24px 0"><tr><td style="background:{theme.button_background};'
+                f'border-radius:{theme.radius}px">'
                 f'<a href="{url}" target="_blank" rel="noopener noreferrer" '
-                'style="display:inline-block;padding:13px 22px;color:#172016;'
+                'style="display:inline-block;padding:13px 22px;'
+                f'background:{theme.button_background};border-radius:{theme.radius}px;'
+                f'color:{theme.button_text};'
                 f'text-decoration:none;font-weight:bold">{label}</a></td></tr></table>'
             )
         if node_type == "emailVideo":
@@ -208,7 +215,7 @@ class EditorService:
             return (
                 f'<a href="{html.escape(source, quote=True)}" target="_blank" '
                 'rel="noopener noreferrer" style="display:block;width:25%;max-width:144px;'
-                'margin:16px 0;color:#142019;text-decoration:underline">'
+                f'margin:16px 0;color:{theme.text};text-decoration:underline">'
                 f'<img src="{html.escape(poster, quote=True)}" alt="{label}" width="144" '
                 'style="display:block;width:100%;max-width:144px;height:auto">'
                 f'<span style="font-size:12px">▶ {label}</span></a>'
@@ -233,8 +240,9 @@ class EditorService:
             )
         if node_type == "caseStudyBlock":
             return (
-                '<div style="margin:20px 0;padding:16px;border-left:4px solid #d6f04a;'
-                f'background:#f7f8f3">{inner}</div>'
+                '<div style="margin:20px 0;padding:16px;'
+                f'border-left:4px solid {theme.button_background};'
+                f'background:{theme.background};color:{theme.text}">{inner}</div>'
             )
         if node_type == "unsubscribeBlock":
             return ""  # Replaced with one mandatory footer after all content.
