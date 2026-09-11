@@ -28,26 +28,29 @@ def test_link_rewrite_is_urlsafe() -> None:
 
 
 @pytest.mark.asyncio
-async def test_send_success(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("port,tls", [(465, True), (587, True), (1025, False)])
+async def test_send_success(monkeypatch: pytest.MonkeyPatch, port: int, tls: bool) -> None:
     sender = SenderService.__new__(SenderService)
     sender.workspace_id = uuid4()
     sender.settings = Mock(
         public_base_url="https://mailer.example",
         smtp_host="smtp.example.com",
-        smtp_port=587,
+        smtp_port=port,
         smtp_username="user",
         smtp_password="pass",
-        smtp_use_tls=True,
+        smtp_use_tls=tls,
     )
     row = EmailMessage(id=uuid4(), workspace_id=sender.workspace_id)
     sender.repo = Mock(add=AsyncMock(return_value=row), db=AsyncMock())
     sender._check_domain_rate = AsyncMock()  # type: ignore[method-assign]
-    monkeypatch.setattr(
-        "app.modules.sender.service.aiosmtplib.send", AsyncMock(return_value=({}, "id"))
-    )
+    smtp_send = AsyncMock(return_value=({}, "id"))
+    monkeypatch.setattr("app.modules.sender.service.aiosmtplib.send", smtp_send)
     result = await sender.send(payload())
     assert result.status == "sent"
     assert result.sent_at is not None
+    options = smtp_send.await_args.kwargs
+    assert options["use_tls"] is (tls and port == 465)
+    assert options["start_tls"] is (tls and port != 465)
 
 
 @pytest.mark.asyncio

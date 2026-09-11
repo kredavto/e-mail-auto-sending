@@ -213,7 +213,7 @@ services:
       minio-init:
         condition: service_completed_successfully
     command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "emails,tracking,enrichment,bitrix,analytics,notifications,webhooks,billing,dead_letter", "--loglevel=INFO", "--concurrency=2"]
-    networks: [internal]
+    networks: [internal, outbound]
     deploy:
       resources:
         limits:
@@ -242,6 +242,8 @@ services:
 networks:
   internal:
     internal: true
+  outbound:
+    driver: bridge
   edge:
     external: true
     name: ${MAILER_EDGE_NETWORK:-tiktokbot_default}

@@ -24,6 +24,7 @@ from app.modules.sender.repository import MessageRepository
 from app.modules.sender.schemas import SendEmailRequest
 from app.modules.warmup.models import WarmupPlan
 from app.shared.email_footer import with_unsubscribe_footer, with_unsubscribe_text
+from app.shared.smtp import smtp_security_options
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +147,7 @@ class SenderService:
                     port=self.settings.smtp_port,
                     username=self.settings.smtp_username or None,
                     password=self.settings.smtp_password or None,
-                    start_tls=self.settings.smtp_use_tls,
+                    **smtp_security_options(self.settings.smtp_port, self.settings.smtp_use_tls),
                     timeout=30,
                 )
                 row.provider_message_id = str(response[1])

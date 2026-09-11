@@ -83,8 +83,11 @@ def test_notification_serialization_and_channel_preferences() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("port,tls", [(465, True), (587, True), (1025, False)])
 async def test_notification_publish_send_email_and_event(
     monkeypatch: pytest.MonkeyPatch,
+    port: int,
+    tls: bool,
 ) -> None:
     row = notification_row("error")
     redis = SimpleNamespace(publish=AsyncMock(side_effect=ConnectionError("down")))
@@ -97,6 +100,8 @@ async def test_notification_publish_send_email_and_event(
         smtp_host="smtp.example.com",
         smtp_username="mailer",
         smtp_password="password",
+        smtp_port=port,
+        smtp_use_tls=tls,
     )
     dispatcher = NotificationDispatcher(db, redis=redis, settings=settings)  # type: ignore[arg-type]
     await dispatcher._publish(row.user_id, {"message": "hello"})
@@ -105,6 +110,8 @@ async def test_notification_publish_send_email_and_event(
     delivery_id = uuid4()
     await dispatcher._send_email(row, delivery_id)
     smtp_send.assert_awaited_once()
+    assert smtp_send.await_args.kwargs["use_tls"] is (tls and port == 465)
+    assert smtp_send.await_args.kwargs["start_tls"] is (tls and port != 465)
     message_id_domain = settings.notification_from_email.rsplit("@", 1)[-1]
     assert smtp_send.await_args.args[0]["Message-ID"] == (
         f"<notification-{delivery_id}@{message_id_domain}>"

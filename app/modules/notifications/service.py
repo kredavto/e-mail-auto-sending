@@ -25,6 +25,7 @@ from app.modules.notifications.models import (
 from app.modules.notifications.repository import NotificationRepository
 from app.modules.notifications.schemas import PreferenceUpdate, WebPushSubscriptionCreate
 from app.modules.users.models import User, WorkspaceMember
+from app.shared.smtp import smtp_security_options
 
 logger = logging.getLogger(__name__)
 CRITICAL_TYPES = {"error", "blacklist_detected", "smtp_auth_failed", "complaint"}
@@ -135,7 +136,7 @@ class NotificationDispatcher:
             port=self.settings.smtp_port,
             username=self.settings.smtp_username or None,
             password=self.settings.smtp_password or None,
-            start_tls=self.settings.smtp_use_tls,
+            **smtp_security_options(self.settings.smtp_port, self.settings.smtp_use_tls),
             timeout=30,
         )
 
