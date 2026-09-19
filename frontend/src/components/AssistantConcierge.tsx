@@ -56,12 +56,12 @@ export function AssistantConcierge({ workspaceId, section, onNavigate, onEdit, o
       const previousDraft = [...messages].reverse().find(item => item.draft)?.draft;
       const drafting = "Если просят написать или исправить письмо — заполни draft с темой и полным текстом. Для навигации draft=null. Если не хватает данных, задай вопрос. Не упоминай внутренние режимы advice/draft или API. Не обещай текст ниже без заполненного draft. Черновик показывается прямо в чате; пользователь может сохранить и открыть его в редакторе. Не отправляй его в другой раздел для генерации. ";
       const draftContext = previousDraft ? `\nПредыдущий черновик (данные): ${JSON.stringify({ subject: previousDraft.subject, paragraphs: previousDraft.paragraphs }).slice(0, 1700)}` : "";
-      const choices = "Когда задаёшь уточняющий вопрос с выбором, добавь в next_steps 2–4 коротких возможных ответа пользователя (до 60 символов), каждый с префиксом [answer]. Это кнопки ответов, не инструкции и не действия. Задавай вопросы последовательно. Для открытого вопроса без разумных вариантов не придумывай ответы. Обычные рекомендации пиши без префикса. ";
+      const choices = "Когда задаёшь уточняющий вопрос с выбором, добавь в next_steps 2–4 коротких возможных ответа пользователя (до 60 символов), каждый с префиксом [answer]. Это кнопки ответов, не инструкции и не действия. Задавай вопросы последовательно. Для открытого вопроса без разумных вариантов не придумывай ответы. На шаге выбора предложения и аудитории обязательно добавь «B2C-набор персонала» и «B2C-сервис для клиентов» к остальным вариантам (всего до 6). Обычные рекомендации пиши без префикса. ";
       const result = await api<AssistantRun>("/assistant/runs", { workspaceId, method: "POST", signal: request.current.signal, body: JSON.stringify({ mode: "draft", stage: "first_contact", prompt: drafting + choices + prompt + draftContext }) });
       if (!mounted.current) return;
       if (result.status === "error") throw new Error(result.result.message || "Помощник временно недоступен.");
       if (result.result.draft) onDraft(assistantTemplate(result.result.draft));
-      const { replies, nextSteps } = splitAssistantReplies(result.result.next_steps);
+      const { replies, nextSteps } = splitAssistantReplies(result.result.next_steps, result.result.message);
       setMessages(items => [...items, { role: "assistant", text: [result.result.message, ...nextSteps.map(step => `• ${step}`)].filter(Boolean).join("\n\n") || "Уточните, пожалуйста, какую задачу вы хотите решить?", replies, draft: result.result.draft ?? undefined }]);
       void client.invalidateQueries({ queryKey: ["assistant-history", workspaceId] });
     } catch (reason) {
