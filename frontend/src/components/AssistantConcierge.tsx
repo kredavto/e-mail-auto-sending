@@ -65,11 +65,6 @@ export function AssistantConcierge({ workspaceId, section, onNavigate, onEdit }:
     launcher.current?.focus();
   }
   function explain(text: string) { setMessages(items => [...items, { role: "assistant", text }]); }
-  function navigate(target: StudioSection) {
-    onNavigate(target);
-    explain(tips[target]);
-    setOpen(false);
-  }
   async function send() {
     const text = input.trim();
     if (text.length < 3 || inFlight.current) return;
@@ -114,20 +109,12 @@ export function AssistantConcierge({ workspaceId, section, onNavigate, onEdit }:
     } finally { inFlight.current = false; if (mounted.current) setBusy(false); }
   }
   if (!context.data?.counts) return null;
-  const next = nextStep(context.data);
   return <div className="assistant-concierge">
     {open && <section id="concierge-dialog" role="dialog" aria-modal="false" aria-labelledby="concierge-title" className="concierge-dialog" onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}>
       <header className="concierge-header"><div><h2 id="concierge-title">Ваш ИИ-помощник</h2><p>Помогу разобраться и сделать следующий шаг</p></div><button type="button" aria-label="Свернуть помощника" onClick={close}>×</button></header>
       <div ref={log} role="log" aria-label="Диалог с помощником" aria-live="polite" aria-relevant="additions text" className="concierge-log">
         {messages.map((message, index) => <div key={index} className={`concierge-message ${message.role}`}><span>{message.role === "user" ? "Вы" : "Помощник"}</span><p>{message.text}</p>{message.draft && <section className="concierge-draft" aria-label="Черновик письма"><h3>{message.draft.subject}</h3>{message.draft.paragraphs.map((paragraph, i) => <p key={i}>{paragraph}</p>)}<button type="button" className="button primary" disabled={busy} onClick={() => void openDraft(index)}>{message.saved ? "Открыть в редакторе" : "Сохранить и открыть в редакторе"}</button></section>}</div>)}
         {busy && <p role="status">Помощник готовит ответ…</p>}
-      </div>
-      <p className="concierge-hint">Вы сейчас в разделе «{sections[section]}».</p>
-      <div className="concierge-actions">
-        <button type="button" className="button" onClick={() => { void context.refetch(); explain(tips[section]); }}>Что делать в этом разделе?</button>
-        <button type="button" className="button" onClick={() => explain("С чего начнём: у вас уже есть база контактов, готовый текст письма или пока только идея? Выберите нужный раздел ниже или напишите мне.")}>Помогите начать</button>
-        <button type="button" className="button primary" onClick={() => navigate(next)}>Следующий шаг: {sections[next]}</button>
-        <details><summary>Навигация по сайту</summary><nav aria-label="Навигация помощника">{Object.entries(sections).map(([key, label]) => <button type="button" key={key} onClick={() => navigate(key as StudioSection)}>{label}</button>)}</nav></details>
       </div>
       {context.data.delivery_mode === "test" && <p className="concierge-hint">Сейчас включена тестовая доставка. Перед запуском нужна настройка почтового сервиса.</p>}
       {error && <p role="alert" className="concierge-error">{error}</p>}

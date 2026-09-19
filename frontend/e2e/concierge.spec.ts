@@ -28,11 +28,12 @@ test("onboarding greets once, navigates, carries conversation and clears on logo
   await expect(dialog).toBeVisible({ timeout: 8000 });
   await expect(dialog).toContainText("У вас уже есть база CSV или Excel?");
   expect(calls).toBe(0);
-  await dialog.getByRole("button", { name: "Следующий шаг: Контакты и импорт" }).click();
+  await expect(dialog.locator(".concierge-actions")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Свернуть помощника" }).click();
+  await page.getByRole("button", { name: "Контакты и импорт", exact: true }).click();
   await expect(dialog).not.toBeVisible();
   await expect(page.getByRole("button", { name: "Контакты и импорт", exact: true })).toHaveAttribute("aria-current", "page");
   await page.getByRole("button", { name: "✧ ИИ-помощник", exact: true }).click();
-  await expect(dialog).toContainText("сопоставьте столбцы");
   await dialog.getByLabel("Сообщение помощнику").fill("Я предлагаю CRM для автосалонов");
   await dialog.getByRole("button", { name: "Отправить", exact: true }).click();
   await expect(dialog).toContainText("Какую услугу вы предлагаете?");
