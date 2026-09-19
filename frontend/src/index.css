@@ -45,7 +45,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .topbar-account { color: #12171e; background: #e8d1a2; border-color: #e8d1a2; font-weight: 700; text-align: center; }
 .topbar-account:hover { color: #12171e; background: #f5e5c6; border-color: #f5e5c6; }
 .topbar-account:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
-.topbar-note { font-size: 12px; color: #b7b9bd; }
+.topbar-note { font-family: Georgia, "Times New Roman", serif; font-size: 20px; font-style: italic; font-weight: 400; line-height: 1.35; color: #e8d1a2; }
 .motion-toggle { color: #e0d6c1; border: 1px solid #ffffff24; border-radius: 999px; padding: 8px 12px; font-size: 11px; display: flex; align-items: center; gap: 8px; }
 .motion-toggle:disabled { opacity: .75; cursor: default; }
 .studio-hero { position: relative; isolation: isolate; max-width: 1540px; padding: 68px 48px 24px; margin: auto; display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px 45px; overflow: hidden; }
