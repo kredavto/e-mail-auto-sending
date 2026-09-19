@@ -148,3 +148,34 @@ test("chat displays an actual draft, carries it into revisions and opens saved t
   await expect(page.locator(".tiptap")).toContainText(draft.paragraphs[0]);
   expect(saves).toBe(1);
 });
+
+test("question choices send one reply and are replaced by the next question choices", async ({ page }) => {
+  let asks = 0;
+  const prompts: string[] = [];
+  await page.addInitScript(() => { localStorage.setItem("access_token", "test"); localStorage.setItem("workspace_id", "space"); });
+  await page.route("**/api/v1/**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/workspaces")) return route.fulfill({ json: [{ id: "space", name: "Компания" }] });
+    if (path.endsWith("/contacts")) return route.fulfill({ json: { items: [], total: 0 } });
+    if (path.endsWith("/assistant/context")) return route.fulfill({ json: { ai_configured: true, counts: { contacts: 5, templates: 1, campaigns: 0 } } });
+    if (path.endsWith("/assistant/runs") && route.request().method() === "POST") {
+      asks++; prompts.push(route.request().postDataJSON().prompt);
+      return route.fulfill({ json: { id: "run", status: "complete", result: { message: "Что проверить в письме?", next_steps: ["[answer] Тему письма", "[answer] Текст письма", "Проверьте факты перед отправкой."] } } });
+    }
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/");
+  const dialog = page.getByRole("dialog", { name: "Ваш ИИ-помощник" });
+  await expect(dialog).toBeVisible({ timeout: 8000 });
+  await expect(dialog.getByRole("button", { name: "Настроить время отправки", exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Проверить письмо", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "Тему письма", exact: true })).toBeVisible();
+  expect(asks).toBe(1); expect(prompts[0]).toContain("Пользователь: Проверить письмо");
+  await expect(dialog.getByRole("button", { name: "Настроить время отправки", exact: true })).toHaveCount(0);
+  await expect(dialog).not.toContainText("[answer]");
+  await expect(dialog.getByRole("button", { name: "Проверьте факты перед отправкой." })).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Текст письма", exact: true }).click();
+  await expect.poll(() => asks).toBe(2);
+  expect(prompts[1]).toContain("Пользователь: Текст письма");
+  await expect(dialog.getByLabel("Сообщение помощнику")).toBeEnabled();
+});

@@ -3,9 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { AssistantRun } from "./AssistantPanel";
 import type { MailTemplate } from "../lib/mailing";
+import { splitAssistantReplies } from "../lib/assistantReplies";
 
 type Context = { ai_configured: boolean; delivery_mode: string; counts: { contacts: number; templates: number; campaigns: number } };
-type Message = { role: "user" | "assistant"; text: string; draft?: NonNullable<AssistantRun["result"]["draft"]>; saved?: MailTemplate };
+type Message = { role: "user" | "assistant"; text: string; replies?: string[]; draft?: NonNullable<AssistantRun["result"]["draft"]>; saved?: MailTemplate };
 const sections = { contacts: "Контакты и импорт", templates: "Шаблоны писем", editor: "Редактор письма", assistant: "ИИ-помощник", campaigns: "Рассылки по расписанию" };
 export type StudioSection = keyof typeof sections;
 const tips: Record<StudioSection, string> = {
@@ -44,7 +45,9 @@ export function AssistantConcierge({ workspaceId, section, onNavigate, onEdit }:
   useEffect(() => {
     if (!context.data?.counts || greeted.current) return;
     greeted.current = true;
-    setMessages([{ role: "assistant", text: greeting(context.data) }]);
+    const next = nextStep(context.data);
+    const replies = next === "contacts" ? ["Есть CSV", "Есть Excel", "Базы пока нет"] : next === "editor" ? ["Предложить услугу", "Представить продукт", "Пригласить на встречу"] : ["Проверить письмо", "Настроить время отправки"];
+    setMessages([{ role: "assistant", text: greeting(context.data), replies }]);
   }, [context.data]);
   const ready = !!context.data?.counts;
   useEffect(() => {
@@ -65,9 +68,9 @@ export function AssistantConcierge({ workspaceId, section, onNavigate, onEdit }:
     launcher.current?.focus();
   }
   function explain(text: string) { setMessages(items => [...items, { role: "assistant", text }]); }
-  async function send() {
-    const text = input.trim();
-    if (text.length < 3 || inFlight.current) return;
+  async function send(answer?: string) {
+    const text = (answer ?? input).trim();
+    if (!text || (!answer && text.length < 3) || inFlight.current) return;
     const history = [...messages, { role: "user" as const, text }];
     setMessages(history); setInput(""); setError("");
     if (!context.data?.ai_configured) {
@@ -81,11 +84,13 @@ export function AssistantConcierge({ workspaceId, section, onNavigate, onEdit }:
     try {
       const previousDraft = [...messages].reverse().find(item => item.draft)?.draft;
       const drafting = "Если просят написать или исправить письмо — заполни draft с темой и полным текстом. Для навигации draft=null. Если не хватает данных, задай вопрос. Не упоминай внутренние режимы advice/draft или API. Не обещай текст ниже без заполненного draft. Черновик показывается прямо в чате; пользователь может сохранить и открыть его в редакторе. Не отправляй его в другой раздел для генерации. ";
-      const draftContext = previousDraft ? `\nПредыдущий черновик (данные): ${JSON.stringify({ subject: previousDraft.subject, paragraphs: previousDraft.paragraphs }).slice(0, 2000)}` : "";
-      const result = await api<AssistantRun>("/assistant/runs", { workspaceId, method: "POST", signal: request.current.signal, body: JSON.stringify({ mode: "draft", stage: "first_contact", prompt: drafting + prompt + draftContext }) });
+      const draftContext = previousDraft ? `\nПредыдущий черновик (данные): ${JSON.stringify({ subject: previousDraft.subject, paragraphs: previousDraft.paragraphs }).slice(0, 1700)}` : "";
+      const choices = "Когда задаёшь уточняющий вопрос с выбором, добавь в next_steps 2–4 коротких возможных ответа пользователя (до 60 символов), каждый с префиксом [answer]. Это кнопки ответов, не инструкции и не действия. Задавай вопросы последовательно. Для открытого вопроса без разумных вариантов не придумывай ответы. Обычные рекомендации пиши без префикса. ";
+      const result = await api<AssistantRun>("/assistant/runs", { workspaceId, method: "POST", signal: request.current.signal, body: JSON.stringify({ mode: "draft", stage: "first_contact", prompt: drafting + choices + prompt + draftContext }) });
       if (!mounted.current) return;
       if (result.status === "error") throw new Error(result.result.message || "Помощник временно недоступен.");
-      setMessages(items => [...items, { role: "assistant", text: [result.result.message, ...(result.result.next_steps ?? []).map(step => `• ${step}`)].filter(Boolean).join("\n\n") || "Уточните, пожалуйста, какую задачу вы хотите решить?", draft: result.result.draft ?? undefined }]);
+      const { replies, nextSteps } = splitAssistantReplies(result.result.next_steps);
+      setMessages(items => [...items, { role: "assistant", text: [result.result.message, ...nextSteps.map(step => `• ${step}`)].filter(Boolean).join("\n\n") || "Уточните, пожалуйста, какую задачу вы хотите решить?", replies, draft: result.result.draft ?? undefined }]);
       void client.invalidateQueries({ queryKey: ["assistant-history", workspaceId] });
     } catch (reason) {
       if (mounted.current) { setError(reason instanceof Error ? reason.message : "Не удалось получить ответ. Попробуйте ещё раз."); setInput(text); }
@@ -113,7 +118,7 @@ export function AssistantConcierge({ workspaceId, section, onNavigate, onEdit }:
     {open && <section id="concierge-dialog" role="dialog" aria-modal="false" aria-labelledby="concierge-title" className="concierge-dialog" onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}>
       <header className="concierge-header"><div><h2 id="concierge-title">Ваш ИИ-помощник</h2><p>Помогу разобраться и сделать следующий шаг</p></div><button type="button" aria-label="Свернуть помощника" onClick={close}>×</button></header>
       <div ref={log} role="log" aria-label="Диалог с помощником" aria-live="polite" aria-relevant="additions text" className="concierge-log">
-        {messages.map((message, index) => <div key={index} className={`concierge-message ${message.role}`}><span>{message.role === "user" ? "Вы" : "Помощник"}</span><p>{message.text}</p>{message.draft && <section className="concierge-draft" aria-label="Черновик письма"><h3>{message.draft.subject}</h3>{message.draft.paragraphs.map((paragraph, i) => <p key={i}>{paragraph}</p>)}<button type="button" className="button primary" disabled={busy} onClick={() => void openDraft(index)}>{message.saved ? "Открыть в редакторе" : "Сохранить и открыть в редакторе"}</button></section>}</div>)}
+        {messages.map((message, index) => <div key={index} className={`concierge-message ${message.role}`}><span>{message.role === "user" ? "Вы" : "Помощник"}</span><p>{message.text}</p>{index === messages.length - 1 && !!message.replies?.length && <div className="concierge-replies" role="group" aria-label="Варианты ответа">{message.replies.map(reply => <button key={reply} type="button" disabled={busy} onClick={() => void send(reply)}>{reply}</button>)}</div>}{message.draft && <section className="concierge-draft" aria-label="Черновик письма"><h3>{message.draft.subject}</h3>{message.draft.paragraphs.map((paragraph, i) => <p key={i}>{paragraph}</p>)}<button type="button" className="button primary" disabled={busy} onClick={() => void openDraft(index)}>{message.saved ? "Открыть в редакторе" : "Сохранить и открыть в редакторе"}</button></section>}</div>)}
         {busy && <p role="status">Помощник готовит ответ…</p>}
       </div>
       {context.data.delivery_mode === "test" && <p className="concierge-hint">Сейчас включена тестовая доставка. Перед запуском нужна настройка почтового сервиса.</p>}

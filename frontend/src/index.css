@@ -156,3 +156,5 @@ html:has(.studio-intro[data-motion="off"]) { scroll-behavior: auto; }
 .guest-notice-close { float: right; width: 28px; height: 28px; margin: -6px -6px 4px 6px; font-size: 22px; color: #606876; }
 
 .concierge-draft { margin-top: 14px; padding: 12px; border: 1px solid #d6c6a5; border-radius: 10px; background: #fffdf8; }.concierge-draft h3 { font-weight: 700; margin-bottom: 12px; }.concierge-draft p { margin-bottom: 12px; }.concierge-draft .button { font-size: 12px; }
+
+.concierge-replies { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }.concierge-replies button { border: 1px solid #b6a078; border-radius: 16px; padding: 8px 12px; background: #fffdf8; color: #202630; font-size: 13px; font-weight: 600; text-align: left; overflow-wrap: anywhere; }.concierge-replies button:hover { background: #f4e4c4; }.concierge-replies button:disabled { opacity: .5; cursor: wait; }
