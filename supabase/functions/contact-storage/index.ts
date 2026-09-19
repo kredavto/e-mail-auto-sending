@@ -1,7 +1,6 @@
 import postgres from "npm:postgres@3.4.7";
 import { tokenHash } from "./deployment-config.ts";
 
-const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { prepare: false, max: 1 });
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const respond = (value: unknown, status = 200) => Response.json(value, { status });
 Deno.serve(async (req) => {
@@ -9,6 +8,7 @@ Deno.serve(async (req) => {
   const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)))].map(b => b.toString(16).padStart(2, "0")).join("");
   if (!token || hash !== tokenHash) return respond({ error: "Unauthorized" }, 401);
   if (req.method !== "POST") return respond({ error: "POST required" }, 405);
+  const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { prepare: false, max: 1, idle_timeout: 1, connect_timeout: 15 });
   try {
     const body = await req.json();
     const { workspace_id: workspace, base_id: base, run_id: run, table_name: table, name, action } = body;
@@ -75,5 +75,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Contact storage sync failed", error instanceof Error ? error.message : "unknown");
     return respond({ error: "Contact storage sync failed", detail: error instanceof Error ? error.message : "unknown" }, 500);
+  } finally {
+    await sql.end({ timeout: 1 });
   }
 });
