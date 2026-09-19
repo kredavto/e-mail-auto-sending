@@ -23,8 +23,8 @@ export function EditorPage() {
     return () => window.removeEventListener("beforeunload", prevent);
   }, [dirty]);
   function edit(item: MailTemplate | null) {
-    if (dirty && !window.confirm("В редакторе есть несохранённые изменения. Открыть другой шаблон без их сохранения?")) return;
-    setTemplate(item); setEditorKey(key => key + 1); setDirty(false); setTab("editor");
+    if (dirty && !window.confirm("В редакторе есть несохранённые изменения. Открыть другой шаблон без их сохранения?")) return false;
+    setTemplate(item); setEditorKey(key => key + 1); setDirty(false); setTab("editor"); return true;
   }
   return <div className="premium-shell">
     <a href="#studio" className="skip-link">Перейти к рабочей области</a>
@@ -44,7 +44,7 @@ export function EditorPage() {
       </div>
     </main>
     {!authenticated && guestNoticeOpen && <aside className="assistant-guest-notice" aria-label="Доступ к ИИ-помощнику"><button type="button" className="guest-notice-close" aria-label="Закрыть подсказку о входе" onClick={() => setGuestNoticeOpen(false)}>×</button><p>Чтобы вступить в диалог с ИИ-помощником, зарегистрируйтесь и войдите в свой аккаунт в личном кабинете.</p><a className="button primary" href="#account" onClick={() => setGuestNoticeOpen(false)}>Войти / Зарегистрироваться</a></aside>}
-    {authenticated && workspace && <AssistantConcierge key={workspace} workspaceId={workspace} section={tab} onNavigate={target => { setTab(target); document.getElementById("studio")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />}
+    {authenticated && workspace && <AssistantConcierge onEdit={edit} key={workspace} workspaceId={workspace} section={tab} onNavigate={target => { setTab(target); document.getElementById("studio")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />}
     <footer className="studio-footer"><span>PREMIUM B2B MAILER</span><p>Ваш бизнес заслуживает красивых писем.</p><a href="#studio">Вернуться в студию ↑</a></footer>
   </div>;
 }

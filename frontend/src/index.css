@@ -155,3 +155,5 @@ html:has(.studio-intro[data-motion="off"]) { scroll-behavior: auto; }
 @media (max-width: 540px) { .assistant-guest-notice { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); padding: 14px; font-size: 13px; } }
 
 .guest-notice-close { float: right; width: 28px; height: 28px; margin: -6px -6px 4px 6px; font-size: 22px; color: #606876; }
+
+.concierge-draft { margin-top: 14px; padding: 12px; border: 1px solid #d6c6a5; border-radius: 10px; background: #fffdf8; }.concierge-draft h3 { font-weight: 700; margin-bottom: 12px; }.concierge-draft p { margin-bottom: 12px; }.concierge-draft .button { font-size: 12px; }
