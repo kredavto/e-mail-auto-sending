@@ -5,10 +5,11 @@ import { ContactsPanel } from "../components/ContactsPanel";
 import { TemplatesPanel } from "../components/TemplatesPanel";
 import { AssistantPanel } from "../components/AssistantPanel";
 import type { Contact, MailTemplate } from "../lib/mailing";
+import { AssistantConcierge, type StudioSection } from "../components/AssistantConcierge";
 import { StudioHero } from "../components/StudioHero";
 
 export function EditorPage() {
-  const [tab, setTab] = useState(window.location.hash.startsWith("#assistant=") ? "assistant" : "editor");
+  const [tab, setTab] = useState<StudioSection>(window.location.hash.startsWith("#assistant=") ? "assistant" : "editor");
   const [workspace, setWorkspace] = useState(localStorage.getItem("workspace_id") ?? "");
   const [template, setTemplate] = useState<MailTemplate | null>(null);
   const [contact, setContact] = useState<Contact | null>(null);
@@ -28,7 +29,7 @@ export function EditorPage() {
     <StudioHero onStudio={() => setTab("editor")} />
     <main id="studio" className="studio-workspace" tabIndex={-1}>
       <aside className="studio-sidebar"><div className="sidebar-heading"><span className="sidebar-monogram" aria-hidden="true">M /</span><p>WORKSPACE<small>Ваша студия</small></p></div>
-        <nav aria-label="Разделы приложения" className="studio-nav">{[["contacts", "Контакты и импорт", "01", "База для новых диалогов"], ["templates", "Шаблоны писем", "02", "Библиотека вашего голоса"], ["editor", `Редактор письма${dirty ? " •" : ""}`, "03", "Текст, стиль и детали"], ["assistant", "ИИ-помощник", "04", "Идеи и расписание"], ["campaigns", "Рассылки по расписанию", "05", "До 50 000 получателей"]].map(([key, label, number, description]) => <button key={key} aria-label={label} aria-current={tab === key ? "page" : undefined} className="studio-nav-item" onClick={() => setTab(key)}><span className="nav-number" aria-hidden="true">{number}</span><span>{label}<small aria-hidden="true">{description}</small></span><span className="nav-arrow" aria-hidden="true">↗</span></button>)}</nav>
+        <nav aria-label="Разделы приложения" className="studio-nav">{[["contacts", "Контакты и импорт", "01", "База для новых диалогов"], ["templates", "Шаблоны писем", "02", "Библиотека вашего голоса"], ["editor", `Редактор письма${dirty ? " •" : ""}`, "03", "Текст, стиль и детали"], ["assistant", "ИИ-помощник", "04", "Идеи и расписание"], ["campaigns", "Рассылки по расписанию", "05", "До 50 000 получателей"]].map(([key, label, number, description]) => <button key={key} aria-label={label} aria-current={tab === key ? "page" : undefined} className="studio-nav-item" onClick={() => setTab(key as StudioSection)}><span className="nav-number" aria-hidden="true">{number}</span><span>{label}<small aria-hidden="true">{description}</small></span><span className="nav-arrow" aria-hidden="true">↗</span></button>)}</nav>
         <div className="sidebar-note"><span aria-hidden="true">✧</span><p>Внимание к деталям.<small>Проверьте письмо перед отправкой. Сильное впечатление начинается с точности.</small></p></div>
       </aside>
       <div className="studio-content"><div className="workspace-heading"><div><p>PREMIUM B2B MAILER</p><h2>Пространство ваших идей</h2></div><span className="workspace-tag">Творчество. Под контролем.</span></div>
@@ -40,6 +41,7 @@ export function EditorPage() {
     <div className="workspace-view" hidden={tab !== "editor"}><EmailEditor key={editorKey} workspaceId={workspace} template={template} contact={contact} onSaved={setTemplate} onDirty={setDirty} onChooseContact={() => setTab("contacts")} /></div>
       </div>
     </main>
+    {workspace && <AssistantConcierge key={workspace} workspaceId={workspace} section={tab} onNavigate={target => { setTab(target); document.getElementById("studio")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />}
     <footer className="studio-footer"><span>PREMIUM B2B MAILER</span><p>Ваш бизнес заслуживает красивых писем.</p><a href="#studio">Вернуться в студию ↑</a></footer>
   </div>;
 }
