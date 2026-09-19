@@ -60,7 +60,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .hero-cta > span { font-size: 20px; line-height: 1; }
 .hero-capabilities { display: flex; flex-wrap: wrap; gap: 13px; align-items: center; font-size: 10px; color: #939eae; margin-top: 23px; }
 .hero-capabilities i { width: 3px; height: 3px; border-radius: 50%; background: #9b855d; }
-.hero-art { position: relative; min-height: 400px; display: grid; place-items: center; }
+.hero-art { position: relative; min-height: 400px; display: grid; place-items: center; transform: scale(1.1); transform-origin: center; }
 .orbit { position: absolute; border: 1px solid #d5bf9619; border-radius: 50%; pointer-events: none; }
 .orbit-one { width: 430px; height: 430px; }
 .orbit-two { width: 540px; height: 540px; border-style: dashed; opacity: .4; }
@@ -113,7 +113,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .studio-nav-item:hover { background-color: #ffffff09; }.studio-nav-item:hover .nav-arrow { opacity: 1; }
 }
 @media (max-width: 1100px) {
-  .studio-topbar { padding: 20px 28px; }.studio-hero { padding: 36px 28px 22px; gap: 20px; }.hero-copy { padding-top: 25px; }.hero-art { transform: scale(.85); transform-origin: center; }.workspace-tag { display: none; }
+  .studio-topbar { padding: 20px 28px; }.studio-hero { padding: 36px 28px 22px; gap: 20px; }.hero-copy { padding-top: 25px; }.hero-art { transform: scale(.93); transform-origin: center; }.workspace-tag { display: none; }
   .studio-workspace { display: block; padding: 32px 20px 52px; }.studio-sidebar { position: static; max-height: none; overflow: visible; padding: 20px 16px; margin-bottom: 26px; }.sidebar-heading { margin-bottom: 18px; }.sidebar-note { display: none; }.studio-nav { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 820px) {
