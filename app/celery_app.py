@@ -66,10 +66,6 @@ celery_app.conf.update(
     task_acks_late=True,
     task_reject_on_worker_lost=True,
     beat_schedule={
-        "sync-contact-bases-to-supabase": {
-            "task": "app.modules.contact_storage.tasks.sync_contacts",
-            "schedule": 300.0,
-        },
         "schedule-active-campaigns-every-minute": {
             "task": "app.modules.scheduler.tasks.schedule_campaigns",
             "schedule": 60.0,

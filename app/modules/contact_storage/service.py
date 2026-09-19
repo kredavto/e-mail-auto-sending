@@ -76,17 +76,16 @@ class ContactStorage:
         await send("finish", expected_count=total)
         return total
 
-    async def sync_all(self) -> dict:
+    async def sync_all(self, workspace_id: UUID | None = None, base_id: UUID | None = None) -> dict:
         if not self.settings.supabase_contact_storage_url:
             return {"status": "disabled"}
+        filters = [Segment.filters["kind"].astext == "contact_list"]
+        if workspace_id is not None:
+            filters.append(Segment.workspace_id == workspace_id)
+        if base_id is not None:
+            filters.append(Segment.id == base_id)
         bases = list(
-            (
-                await self.db.scalars(
-                    select(Segment)
-                    .where(Segment.filters["kind"].astext == "contact_list")
-                    .order_by(Segment.id)
-                )
-            ).all()
+            (await self.db.scalars(select(Segment).where(*filters).order_by(Segment.id))).all()
         )
         count = 0
         async with httpx.AsyncClient(

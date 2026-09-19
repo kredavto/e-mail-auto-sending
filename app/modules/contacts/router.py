@@ -11,6 +11,7 @@ from app.database import get_db
 from app.modules.audit.service import AuditService
 from app.modules.billing.service import BillingService
 from app.modules.contact_storage.service import table_name
+from app.modules.contact_storage.tasks import sync_contacts
 from app.modules.contacts.importing import prepare_import_rows
 from app.modules.contacts.lists import ContactLists
 from app.modules.contacts.repository import ContactRepository
@@ -240,3 +241,17 @@ async def rename_contact_list(
     row.name = data.name.strip()
     await db.flush()
     return row
+
+
+@router.post("/lists/{list_id}/import-complete", status_code=202)
+async def complete_list_import(
+    list_id: UUID,
+    tenant: TenantContext = Depends(get_tenant_context),
+    db: AsyncSession = Depends(get_db),
+):
+    await ContactLists(db, tenant.workspace_id).get(list_id)
+    await db.commit()
+    if not get_settings().supabase_contact_storage_url:
+        return {"status": "disabled"}
+    sync_contacts.delay(str(tenant.workspace_id), str(list_id))
+    return {"status": "queued"}

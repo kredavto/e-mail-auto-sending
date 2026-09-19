@@ -1,12 +1,14 @@
 import { expect, test } from "@playwright/test";
 
 test("named imports survive reload, can be renamed and selected, including existing contacts", async ({ page }) => {
+  const synchronized: string[] = [];
   const lists: { id: string; name: string; emails: string[] }[] = [];
   const contacts = new Map<string, { id: string; email: string; full_name: string; company: string; status: string }>();
   await page.addInitScript(() => {
     localStorage.setItem("access_token", "test-token"); localStorage.setItem("workspace_id", "test-workspace");
   });
   await page.route("**/api/v1/**", route => {
+    if (new URL(route.request().url()).pathname.endsWith("/signatures")) return route.fulfill({ json: [] });
     const url = new URL(route.request().url()), path = url.pathname;
     const method = route.request().method();
     const reply = (json: unknown) => route.fulfill({ json });
@@ -22,6 +24,11 @@ test("named imports survive reload, can be renamed and selected, including exist
     if (path.includes("/contacts/lists/") && method === "PATCH") {
       const list = lists.find(item => item.id === path.split("/").at(-1))!;
       list.name = route.request().postDataJSON().name; return reply(list);
+    }
+    if (path.endsWith("/import-complete")) {
+      const id = path.split("/").at(-2)!;
+      expect(lists.find(item => item.id === id)?.emails).toHaveLength(2);
+      synchronized.push(id); return reply({ status: "queued" });
     }
     if (path.endsWith("/contacts/bulk")) {
       const body = route.request().postDataJSON(), list = lists.find(item => item.id === body.list_id)!;
@@ -49,6 +56,7 @@ test("named imports survive reload, can be renamed and selected, including exist
     await expect(page.getByRole("combobox", { name: "Выбрать базу контактов", exact: true })).toHaveValue(lists.at(-1)!.id);
   }
   expect(contacts.size).toBe(3);
+  expect(synchronized).toEqual(["list-1", "list-2"]);
   await page.reload();
   await page.getByRole("button", { name: "Контакты и импорт", exact: true }).click();
   const selector = page.getByRole("combobox", { name: "Выбрать базу контактов", exact: true });
@@ -71,7 +79,7 @@ test("named imports survive reload, can be renamed and selected, including exist
   await expect(form.getByText("a@example.com", { exact: false })).toBeVisible();
   await expect(form.getByText("c@example.com", { exact: false })).toHaveCount(0);
   await form.getByRole("checkbox").first().check();
-  await expect(form.getByText("Выбрано получателей: 1 / 1000")).toBeVisible();
+  await expect(form.getByText("Выбрано получателей: 1 / 50 000")).toBeVisible();
   await recipients.selectOption({ label: "Казань" });
-  await expect(form.getByText("Выбрано получателей: 0 / 1000")).toBeVisible();
+  await expect(form.getByText("Выбрано получателей: 0 / 50 000")).toBeVisible();
 });

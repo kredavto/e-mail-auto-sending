@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 test("70000 data rows plus a header import intact in batches; row and expanded-email overflow are rejected", async ({ page }) => {
   test.setTimeout(120000);
   let imports = 0;
+  let syncs = 0;
   const received: { email: string; company: string }[] = [];
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
@@ -13,8 +14,10 @@ test("70000 data rows plus a header import intact in batches; row and expanded-e
     localStorage.setItem("workspace_id", "test-workspace");
   });
  await page.route("**/api/v1/**", route => {
+    if (new URL(route.request().url()).pathname.endsWith("/signatures")) return route.fulfill({ json: [] });
       if (new URL(route.request().url()).pathname.endsWith("/contacts/lists")) return route.fulfill({ json: route.request().method() === "POST" ? { id: "test-list", name: route.request().postDataJSON().name } : [{ id: "test-list", name: "Тестовая база" }] });
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/import-complete")) { syncs++; return route.fulfill({ json: { status: "queued" } }); }
     if (path.endsWith("/workspaces")) return route.fulfill({ json: [{ id: "test-workspace", name: "Тест" }] });
     if (path.endsWith("/templates")) return route.fulfill({ json: [] });
     if (path.endsWith("/contacts")) return route.fulfill({ json: { items: [], total: 0 } });
@@ -41,6 +44,7 @@ test("70000 data rows plus a header import intact in batches; row and expanded-e
   await expect(page.getByRole("status").filter({ hasText: "Создано: 70000." })).toBeVisible({ timeout: 90000 });
   await expect(input).toBeEnabled();
   expect(imports).toBe(140);
+  expect(syncs).toBe(1);
   expect(received).toHaveLength(70000);
   expect(new Set(received.map(contact => contact.email)).size).toBe(70000);
   expect(received[0]).toMatchObject({ email: "c0@example.com", company: "Компания 0" });
@@ -54,18 +58,22 @@ test("70000 data rows plus a header import intact in batches; row and expanded-e
   await expect(page.getByText("После разделения email получилось больше 70000 контактов.", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "Импортировать 0 контактов", exact: true })).toBeDisabled();
   expect(imports).toBe(140);
+  expect(syncs).toBe(1);
   expect(errors).toEqual([]);
 });
 
 test("interrupted import reports saved contacts and resumes without repeating confirmed batches", async ({ page }) => {
   const starts: string[] = [];
+  let syncs = 0;
   await page.addInitScript(() => {
     localStorage.setItem("access_token", "test-token");
     localStorage.setItem("workspace_id", "test-workspace");
   });
   await page.route("**/api/v1/**", route => {
+    if (new URL(route.request().url()).pathname.endsWith("/signatures")) return route.fulfill({ json: [] });
       if (new URL(route.request().url()).pathname.endsWith("/contacts/lists")) return route.fulfill({ json: route.request().method() === "POST" ? { id: "test-list", name: route.request().postDataJSON().name } : [{ id: "test-list", name: "Тестовая база" }] });
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/import-complete")) { syncs++; return route.fulfill({ json: { status: "queued" } }); }
     if (path.endsWith("/workspaces")) return route.fulfill({ json: [{ id: "test-workspace", name: "Тест" }] });
     if (path.endsWith("/templates")) return route.fulfill({ json: [] });
     if (path.endsWith("/contacts")) return route.fulfill({ json: { items: [], total: 0 } });
@@ -85,8 +93,10 @@ test("interrupted import reports saved contacts and resumes without repeating co
   await expect(page.getByRole("alert")).toContainText("Подтверждено создано: 500");
   await expect(confirm).toBeEnabled();
   expect(starts).toEqual(["c0@example.com", "c500@example.com"]);
+  expect(syncs).toBe(0);
   await confirm.click();
   await expect(page.getByRole("status").filter({ hasText: "Создано: 1001." })).toBeVisible();
   expect(starts).toEqual(["c0@example.com", "c500@example.com", "c500@example.com", "c1000@example.com"]);
   await expect(confirm).toBeDisabled();
+  expect(syncs).toBe(1);
 });

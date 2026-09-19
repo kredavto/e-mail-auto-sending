@@ -99,6 +99,8 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
         run.next++; run.processed += batch.count;
         setProgress(run.processed); setResult(run.report);
       }
+      await api(`/contacts/lists/${run.listId}/import-complete`, { workspaceId, method: "POST" });
+      await client.invalidateQueries({ queryKey: ["contact-lists", workspaceId] });
       setCompleted(true);
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : "Ошибка импорта.";
@@ -148,7 +150,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
         <label className="field">Название сохранённой базы<input maxLength={200} value={listName} disabled={busy || listBusy} onChange={e => setListName(e.target.value)} /></label>
         <button className="button" disabled={busy || listBusy || !workspaceId || !listName.trim()} onClick={() => void saveListName()}>{selectedList ? "Сохранить название" : "Сохранить все контакты как базу"}</button>
       </div>
-      {selectedList && lists.data?.find(item => item.id === selectedList)?.supabase_table && <p className="hint break-all">Таблица Supabase: {lists.data.find(item => item.id === selectedList)?.supabase_table}. Синхронизация автоматически каждые 5 минут. Последнее сохранение: {lists.data.find(item => item.id === selectedList)?.supabase_synced_at ? new Date(lists.data.find(item => item.id === selectedList)!.supabase_synced_at!).toLocaleString("ru-RU") : "ожидается"}.</p>}
+      {selectedList && lists.data?.find(item => item.id === selectedList)?.supabase_table && <p className="hint break-all">Таблица Supabase: {lists.data.find(item => item.id === selectedList)?.supabase_table}. Сохранение в Supabase запускается автоматически после завершения загрузки базы. Последнее сохранение: {lists.data.find(item => item.id === selectedList)?.supabase_synced_at ? new Date(lists.data.find(item => item.id === selectedList)!.supabase_synced_at!).toLocaleString("ru-RU") : "ожидается"}.</p>}
       {lists.error && <p role="alert" className="error-box">{lists.error.message}</p>}
       {contacts.error && <p role="alert" className="error-box">{contacts.error.message}</p>}
       {contacts.isFetching && <p>Загрузка…</p>}
