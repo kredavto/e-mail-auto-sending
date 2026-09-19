@@ -71,7 +71,7 @@ export function AssistantConcierge({ workspaceId, section, onNavigate, onEdit }:
     const history = [...messages, { role: "user" as const, text }];
     setMessages(history); setInput(""); setError("");
     if (!context.data?.ai_configured) {
-      explain(`Свободный диалог с ИИ пока недоступен. Могу провести вас по разделам с помощью кнопок ниже. ${tips[section]}`);
+      explain(`Свободный диалог с ИИ пока недоступен. Пока воспользуйтесь разделами в панели Workspace. ${tips[section]}`);
       return;
     }
     inFlight.current = true; setBusy(true);
@@ -123,7 +123,7 @@ export function AssistantConcierge({ workspaceId, section, onNavigate, onEdit }:
         <textarea id="concierge-input" value={input} onChange={event => setInput(event.target.value)} maxLength={1500} rows={2} placeholder="Что вы хотите сделать?" disabled={busy} />
         <button className="button primary" disabled={busy || input.trim().length < 3}>Отправить</button>
       </form>
-      <p className="concierge-hint">{context.data.ai_configured ? "Сообщения обрабатывает ИИ. Ответы сохраняются в истории помощника." : "ИИ пока не подключён. Подсказки и навигация доступны."}</p>
+      <p className="concierge-hint">{context.data.ai_configured ? "Сообщения обрабатывает ИИ. Ответы сохраняются в истории помощника." : "ИИ пока не подключён."}</p>
     </section>}
     <button ref={launcher} type="button" className="concierge-launcher" aria-expanded={open} aria-controls="concierge-dialog" onClick={() => { if (open) close(); else { setOpen(true); void context.refetch(); } }}>✧ {open ? "Свернуть" : "ИИ-помощник"}</button>
   </div>;
