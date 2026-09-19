@@ -37,9 +37,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .premium-shell { overflow-x: clip; }
 .studio-intro { color: #f4f1e9; background: #12171e; }
 .studio-topbar { max-width: 1540px; padding: 24px 48px; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid #ffffff12; }
-.studio-brand { display: flex; gap: 13px; align-items: center; font-family: Manrope, sans-serif; font-weight: 750; font-size: 14px; letter-spacing: .15em; text-decoration: none; }
-.brand-subtitle { display: block; font-size: 9px; letter-spacing: .27em; color: #b7b9bd; margin-top: 3px; }
-.brand-mark { display: grid; place-items: center; position: relative; width: 38px; height: 43px; color: #e8d1a2; border: 1px solid #e8d1a260; border-radius: 6px 6px 15px 6px; font-family: Georgia, serif; font-size: 26px; font-weight: 400; letter-spacing: -.14em; padding-right: 4px; }
+.studio-brand { display: flex; gap: 16px; align-items: center; flex-shrink: 0; font-family: Manrope, sans-serif; font-weight: 750; font-size: 22px; letter-spacing: .15em; text-decoration: none; }
+.brand-subtitle { display: block; font-size: 12px; letter-spacing: .27em; color: #b7b9bd; margin-top: 3px; }
+.brand-mark { display: grid; place-items: center; position: relative; width: 52px; height: 58px; flex-shrink: 0; color: #e8d1a2; border: 1px solid #e8d1a260; border-radius: 6px 6px 15px 6px; font-family: Georgia, serif; font-size: 36px; font-weight: 400; letter-spacing: -.14em; padding-right: 4px; }
 .brand-mark span { position: absolute; right: -4px; top: -4px; width: 7px; height: 7px; border-radius: 50%; background: #e8d1a2; border: 2px solid #12171e; }
 .topbar-end { display: flex; align-items: center; gap: 26px; }
 .topbar-account { color: #12171e; background: #e8d1a2; border-color: #e8d1a2; font-weight: 700; text-align: center; }
@@ -120,10 +120,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .topbar-note { display: none; }.studio-hero { grid-template-columns: 1fr; padding: 36px 24px 22px; }.hero-copy { padding: 0; }.hero-copy h1 { font-size: clamp(38px,7.4vw,58px); }.hero-art { min-height: 320px; margin: -4px 0 -18px; transform: scale(.74); }.hero-bottom { margin-top: 0; }.art-caption { bottom: -28px; }.studio-workspace { padding: 28px 16px 44px; }.workspace-heading { margin-bottom: 20px; }.studio-footer { padding: 24px 20px; }.studio-footer p { display: none; }
 }
 @media (max-width: 540px) {
+  .studio-topbar { flex-wrap: wrap; }.topbar-end { width: 100%; justify-content: space-between; gap: 12px; }
   .studio-sidebar { padding: 20px 12px; }.studio-nav { grid-template-columns: 1fr; }.studio-nav-item { min-height: 80px; }
 }
 @media (max-width: 420px) {
-  .studio-topbar { padding: 17px 18px; gap: 10px; }.studio-brand { font-size: 11px; gap: 10px; }.brand-mark { width: 32px; height: 36px; font-size: 23px; }.brand-subtitle { font-size: 8px; }.motion-toggle { font-size: 10px; padding: 7px 9px; }.studio-hero { padding-left: 20px; padding-right: 20px; }.hero-copy h1 { font-size: 37px; }.hero-eyebrow { font-size: 8px; letter-spacing: .16em; }.hero-description { font-size: 13px; }.hero-art { transform: scale(.68); min-height: 302px; margin-left: -18px; }.hero-bottom { font-size: 8px; letter-spacing: .06em; }.hero-bottom > span:last-child { max-width: 100px; text-align: right; }.hero-capabilities { gap: 10px; font-size: 9px; }
+  .studio-topbar { padding: 17px 18px; gap: 10px; }.studio-brand { font-size: 18px; gap: 13px; }.brand-mark { width: 44px; height: 50px; font-size: 31px; }.brand-subtitle { font-size: 11px; }.motion-toggle { font-size: 10px; padding: 7px 9px; }.studio-hero { padding-left: 20px; padding-right: 20px; }.hero-copy h1 { font-size: 37px; }.hero-eyebrow { font-size: 8px; letter-spacing: .16em; }.hero-description { font-size: 13px; }.hero-art { transform: scale(.68); min-height: 302px; margin-left: -18px; }.hero-bottom { font-size: 8px; letter-spacing: .06em; }.hero-bottom > span:last-child { max-width: 100px; text-align: right; }.hero-capabilities { gap: 10px; font-size: 9px; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
