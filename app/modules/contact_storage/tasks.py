@@ -7,6 +7,8 @@ from app.celery_app import celery_app
 
 @celery_app.task(name="app.modules.contact_storage.tasks.sync_contacts", queue="enrichment")
 def sync_contacts() -> dict:
+    import app.models  # noqa: F401 — register foreign-key targets in standalone workers
+
     from app.database import async_session_factory
     from app.modules.contact_storage.service import ContactStorage
 
