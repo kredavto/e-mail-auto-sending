@@ -32,7 +32,7 @@ export function EditorPage() {
         <div className="sidebar-note"><span aria-hidden="true">✧</span><p>Внимание к деталям.<small>Проверьте письмо перед отправкой. Сильное впечатление начинается с точности.</small></p></div>
       </aside>
       <div className="studio-content"><div className="workspace-heading"><div><p>PREMIUM B2B MAILER</p><h2>Пространство ваших идей</h2></div><span className="workspace-tag">Творчество. Под контролем.</span></div>
-    <AccountPanel workspaceId={workspace} onChange={id => { setWorkspace(id); setTemplate(null); setContact(null); setEditorKey(key => key + 1); setDirty(false); }} />
+    <AccountPanel workspaceId={workspace} onChange={(id, preserveDraft) => { setWorkspace(id); if (preserveDraft) return; setTemplate(null); setContact(null); setEditorKey(key => key + 1); setDirty(false); }} />
     {tab === "campaigns" && <div className="workspace-view"><AssistantPanel key={`campaigns-${workspace}`} workspaceId={workspace} active schedulingOnly onEdit={edit} /></div>}
     <div className="workspace-view" hidden={tab !== "assistant"}><AssistantPanel key={`assistant-${workspace}`} workspaceId={workspace} active={tab === "assistant"} onEdit={edit} /></div>
     <div className="workspace-view" hidden={tab !== "contacts"}><ContactsPanel key={`contacts-${workspace}`} workspaceId={workspace} onPreview={item => { setContact(item); setTab("editor"); }} /></div>
