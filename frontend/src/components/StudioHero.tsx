@@ -35,7 +35,7 @@ export function StudioHero({ onStudio }: { onStudio: () => void }) {
   return <div className="studio-intro" data-motion={active ? "on" : "off"}>
     <div className="studio-topbar">
       <a className="studio-brand" href="#studio" onClick={onStudio} aria-label="Premium B2B Mailer — открыть студию"><span className="brand-mark" aria-hidden="true">M<span /></span><span>PREMIUM<span className="brand-subtitle">B2B MAILER</span></span></a>
-      <div className="topbar-end"><a href="#account" className="button">Вход / Регистрация</a><span className="topbar-note">Деловая переписка. Новый уровень.</span><button type="button" className="motion-toggle" onClick={toggleMotion} disabled={reduced} aria-pressed={active} aria-label="Анимация интерфейса" title={reduced ? "Движение отключено в настройках устройства" : "Включить или выключить анимацию"}><span aria-hidden="true">{active ? "◉" : "○"}</span> {active ? "Моушн вкл." : "Без движения"}</button></div>
+      <div className="topbar-end"><a href="#account" className="button topbar-account">Вход / Регистрация</a><span className="topbar-note">Деловая переписка. Новый уровень.</span><button type="button" className="motion-toggle" onClick={toggleMotion} disabled={reduced} aria-pressed={active} aria-label="Анимация интерфейса" title={reduced ? "Движение отключено в настройках устройства" : "Включить или выключить анимацию"}><span aria-hidden="true">{active ? "◉" : "○"}</span> {active ? "Моушн вкл." : "Без движения"}</button></div>
     </div>
     <header ref={hero} className="studio-hero">
       <div className="hero-glow" aria-hidden="true" />

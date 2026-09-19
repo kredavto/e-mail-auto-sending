@@ -42,6 +42,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .brand-mark { display: grid; place-items: center; position: relative; width: 38px; height: 43px; color: #e8d1a2; border: 1px solid #e8d1a260; border-radius: 6px 6px 15px 6px; font-family: Georgia, serif; font-size: 26px; font-weight: 400; letter-spacing: -.14em; padding-right: 4px; }
 .brand-mark span { position: absolute; right: -4px; top: -4px; width: 7px; height: 7px; border-radius: 50%; background: #e8d1a2; border: 2px solid #12171e; }
 .topbar-end { display: flex; align-items: center; gap: 26px; }
+.topbar-account { color: #12171e; background: #e8d1a2; border-color: #e8d1a2; font-weight: 700; text-align: center; }
+.topbar-account:hover { color: #12171e; background: #f5e5c6; border-color: #f5e5c6; }
+.topbar-account:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
 .topbar-note { font-size: 12px; color: #b7b9bd; }
 .motion-toggle { color: #e0d6c1; border: 1px solid #ffffff24; border-radius: 999px; padding: 8px 12px; font-size: 11px; display: flex; align-items: center; gap: 8px; }
 .motion-toggle:disabled { opacity: .75; cursor: default; }
@@ -128,4 +131,3 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 html:has(.studio-intro[data-motion="off"]) { scroll-behavior: auto; }
 .premium-shell:has(.studio-intro[data-motion="off"]) *, .premium-shell:has(.studio-intro[data-motion="off"]) *::before, .premium-shell:has(.studio-intro[data-motion="off"]) *::after { animation: none !important; transition: none !important; }
-
