@@ -36,8 +36,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* Application chrome only. Email colours remain scoped to .email-canvas / srcDoc. */
 .premium-shell { overflow-x: clip; }
 .studio-intro { position: relative; isolation: isolate; overflow: clip; color: #f4f1e9; background: #12171e; }
-.cursor-spotlight { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; background: radial-gradient(circle 150px at var(--light-x, -200px) var(--light-y, -200px), #ffe5ae30 0%, #f3d49c18 35%, #e8d1a208 65%, transparent 100%); mix-blend-mode: screen; transition: opacity .2s ease; }
-.studio-intro[data-motion="off"] .cursor-spotlight { display: none; }
+.cursor-spotlight { position: fixed; top: 0; left: 0; z-index: 50; pointer-events: none; opacity: 0; background: radial-gradient(circle 150px at var(--light-x, -200px) var(--light-y, -200px), #ffe5ae30 0%, #f3d49c18 35%, #e8d1a208 65%, transparent 100%); mix-blend-mode: screen; transition: opacity .2s ease; }
 @media (hover: none), (prefers-reduced-motion: reduce) { .cursor-spotlight { display: none; } }
 .studio-topbar { max-width: 1540px; padding: 24px 48px; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid #ffffff12; }
 .studio-brand { display: flex; gap: 16px; align-items: center; flex-shrink: 0; font-family: Manrope, sans-serif; font-weight: 750; font-size: 22px; letter-spacing: .15em; text-decoration: none; }

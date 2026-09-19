@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { CursorSpotlight } from "./CursorSpotlight";
 
 function storedMotion() { try { return localStorage.getItem("studio-motion") !== "off"; } catch { return true; } }
 
 export function StudioHero({ onStudio }: { onStudio: () => void }) {
   const hero = useRef<HTMLElement>(null);
-  const intro = useRef<HTMLDivElement>(null);
-  const spotlight = useRef<HTMLDivElement>(null);
   const [motion, setMotion] = useState(storedMotion);
   const [reduced, setReduced] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   useEffect(() => {
@@ -15,37 +14,6 @@ export function StudioHero({ onStudio }: { onStudio: () => void }) {
     return () => query.removeEventListener("change", update);
   }, []);
   const active = motion && !reduced;
-  useEffect(() => {
-    const surface = intro.current;
-    const light = spotlight.current;
-    if (!surface || !light || !active) return;
-    let frame = 0;
-    let clientX = 0, clientY = 0;
-    const paint = () => {
-      frame = 0;
-      const rect = surface.getBoundingClientRect();
-      light.style.setProperty("--light-x", `${clientX - rect.left}px`);
-      light.style.setProperty("--light-y", `${clientY - rect.top}px`);
-      light.style.opacity = "1";
-    };
-    const hide = () => { cancelAnimationFrame(frame); frame = 0; light.style.opacity = "0"; };
-    const move = (event: PointerEvent) => {
-      if (event.pointerType !== "mouse") { hide(); return; }
-      clientX = event.clientX; clientY = event.clientY;
-      if (!frame) frame = requestAnimationFrame(paint);
-    };
-    surface.addEventListener("pointermove", move, { passive: true });
-    surface.addEventListener("pointerleave", hide);
-    window.addEventListener("blur", hide);
-    window.addEventListener("scroll", hide, { passive: true });
-    return () => {
-      hide();
-      surface.removeEventListener("pointermove", move);
-      surface.removeEventListener("pointerleave", hide);
-      window.removeEventListener("blur", hide);
-      window.removeEventListener("scroll", hide);
-    };
-  }, [active]);
   useEffect(() => {
     const element = hero.current;
     if (!element) return;
@@ -65,8 +33,8 @@ export function StudioHero({ onStudio }: { onStudio: () => void }) {
     return () => { cancelAnimationFrame(frame); element.removeEventListener("pointermove", pointer); element.removeEventListener("pointerleave", leave); window.removeEventListener("scroll", schedule); };
   }, [active]);
   function toggleMotion() { const next = !motion; setMotion(next); try { localStorage.setItem("studio-motion", next ? "on" : "off"); } catch { /* Optional preference; work without storage too. */ } }
-  return <div ref={intro} className="studio-intro" data-motion={active ? "on" : "off"}>
-    <div ref={spotlight} className="cursor-spotlight" aria-hidden="true" />
+  return <div className="studio-intro" data-motion={active ? "on" : "off"}>
+    <CursorSpotlight active={active} />
     <div className="studio-topbar">
       <a className="studio-brand" href="#studio" onClick={onStudio} aria-label="Premium B2B Mailer — открыть студию"><span className="brand-mark" aria-hidden="true">M<span /></span><span>PREMIUM<span className="brand-subtitle">B2B MAILER</span></span></a>
       <div className="topbar-end"><a href="#account" className="button topbar-account">Вход / Регистрация</a><span className="topbar-note">Деловая переписка. Новый уровень.</span><button type="button" className="motion-toggle" onClick={toggleMotion} disabled={reduced} aria-pressed={active} aria-label="Анимация интерфейса" title={reduced ? "Движение отключено в настройках устройства" : "Включить или выключить анимацию"}><span aria-hidden="true">{active ? "◉" : "○"}</span> {active ? "Моушн вкл." : "Без движения"}</button></div>
