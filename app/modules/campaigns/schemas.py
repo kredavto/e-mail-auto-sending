@@ -13,7 +13,7 @@ class CampaignCreate(BaseModel):
     sender_email: EmailStr
     sender_name: str
     schedule_start: datetime
-    contact_ids: list[UUID] = Field(default_factory=list, max_length=100000)
+    contact_ids: list[UUID] = Field(default_factory=list, max_length=50000)
 
 
 class CampaignResponse(ORMModel):

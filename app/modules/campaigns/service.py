@@ -1,8 +1,9 @@
 from uuid import UUID
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import AppError, NotFoundError
 from app.modules.audit import audited
 from app.modules.campaigns.models import Campaign, CampaignContact
 from app.modules.campaigns.repository import CampaignRepository
@@ -65,7 +66,14 @@ class CampaignService:
             raise NotFoundError("Кампания не найдена")
         if target not in self.transitions.get(campaign.status, set()):
             raise ValueError(f"Переход {campaign.status} → {target} запрещен")
-        if target == "running":
+        if target in {"running", "scheduled"}:
+            count = await self.db.scalar(
+                select(func.count())
+                .select_from(CampaignContact)
+                .where(CampaignContact.campaign_id == campaign.id)
+            )
+            if not count or count > 50_000:
+                raise AppError("В одной рассылке должно быть от 1 до 50 000 получателей")
             validation = await SequenceService(self.db, self.workspace_id).validate(
                 campaign.sequence_id
             )

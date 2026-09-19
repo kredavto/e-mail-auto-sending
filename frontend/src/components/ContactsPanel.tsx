@@ -5,7 +5,7 @@ import { cellText, contactImportBatches, guessMapping, importFields, MAX_IMPORT_
 import type { Contact, ContactPage } from "../lib/mailing";
 
 type ImportResult = { created: number; skipped: number; errors: string[] };
-type ContactList = { id: string; name: string };
+type ContactList = { id: string; name: string; supabase_table?: string | null; supabase_synced_at?: string | null };
 export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string; onPreview: (contact: Contact) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [sheets, setSheets] = useState<string[]>([]);
@@ -148,6 +148,7 @@ export function ContactsPanel({ workspaceId, onPreview }: { workspaceId: string;
         <label className="field">Название сохранённой базы<input maxLength={200} value={listName} disabled={busy || listBusy} onChange={e => setListName(e.target.value)} /></label>
         <button className="button" disabled={busy || listBusy || !workspaceId || !listName.trim()} onClick={() => void saveListName()}>{selectedList ? "Сохранить название" : "Сохранить все контакты как базу"}</button>
       </div>
+      {selectedList && lists.data?.find(item => item.id === selectedList)?.supabase_table && <p className="hint break-all">Таблица Supabase: {lists.data.find(item => item.id === selectedList)?.supabase_table}. Синхронизация автоматически каждые 5 минут. Последнее сохранение: {lists.data.find(item => item.id === selectedList)?.supabase_synced_at ? new Date(lists.data.find(item => item.id === selectedList)!.supabase_synced_at!).toLocaleString("ru-RU") : "ожидается"}.</p>}
       {lists.error && <p role="alert" className="error-box">{lists.error.message}</p>}
       {contacts.error && <p role="alert" className="error-box">{contacts.error.message}</p>}
       {contacts.isFetching && <p>Загрузка…</p>}

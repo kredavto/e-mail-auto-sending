@@ -13,7 +13,7 @@ const actionNames = { start: "Запустить / возобновить", paus
 const statusNames: Record<string, string> = { draft: "Черновик", running: "Планировщик активен", paused: "На паузе", scheduled: "Запланирована", completed: "Завершена" };
 const dateLabel = (date: string) => new Date(date).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" }) + " МСК";
 
-export function AssistantPanel({ workspaceId, active, onEdit }: { workspaceId: string; active: boolean; onEdit: (template: MailTemplate) => void }) {
+export function AssistantPanel({ workspaceId, active, onEdit, schedulingOnly = false }: { workspaceId: string; active: boolean; schedulingOnly?: boolean; onEdit: (template: MailTemplate) => void }) {
   const client = useQueryClient();
   const [mode, setMode] = useState("draft");
   const [stage, setStage] = useState<Stage>("first_contact");
@@ -74,7 +74,7 @@ export function AssistantPanel({ workspaceId, active, onEdit }: { workspaceId: s
   if (!workspaceId) return <section className="panel">Войдите и выберите рабочее пространство для работы с ИИ.</section>;
   const failure = context.error || templates.error || campaigns.error || history.error;
   return <div className="space-y-5">
-    <section className="panel space-y-4">
+    <section className="panel space-y-4" hidden={schedulingOnly}>
       <h2 className="font-display text-2xl font-bold">ИИ-помощник</h2>
       <p className="hint">Создаёт черновики писем, подсказывает следующие шаги и готовит изменения расписания. Реальная отправка включается только после отдельного подтверждения.</p>
       {failure && <p role="alert" className="error-box">{failure.message}</p>}
@@ -97,6 +97,7 @@ export function AssistantPanel({ workspaceId, active, onEdit }: { workspaceId: s
         </fieldset>
       </form>
     </section>
+    {schedulingOnly && <section className="panel space-y-3"><h2 className="font-display text-2xl font-bold">Массовые рассылки по расписанию</h2><p>Выберите базу до 50 000 адресов, шаблоны и время запуска МСК. Проверка расписания — каждую минуту. Отправка идёт постепенно с учётом лимитов почтового сервиса.</p>{failure && <p role="alert" className="error-box">{failure.message}</p>}{context.data?.delivery_mode === "test" && <p className="error-box">Тестовая доставка: сервер использует Mailpit. Для доставки реальным адресатам необходимо подключить SMTP/SES.</p>}</section>}
     {error && <p role="alert" className="error-box">{error}</p>}
     {run && <section className="panel space-y-4" aria-label="Ответ помощника">
       <div className="flex flex-wrap justify-between gap-2"><h3 className="font-display text-xl font-bold">Результат</h3><a className="hint underline" href={`#assistant=${run.id}`}>Сохранённый запрос · {dateLabel(run.created_at)}</a></div>
@@ -115,7 +116,7 @@ export function AssistantPanel({ workspaceId, active, onEdit }: { workspaceId: s
     <section className="panel space-y-4">
       <div className="flex flex-wrap justify-between gap-2"><h2 className="font-display text-2xl font-bold">Рассылки и расписание</h2><button className="button" disabled={!context.data?.can_manage || busy} onClick={() => setShowComposer(!showComposer)}>Новая рассылка</button></div>
       {!context.data?.can_manage && <p className="hint">Изменения доступны владельцу, администратору или менеджеру.</p>}
-      {showComposer && <CampaignComposer workspaceId={workspaceId} templates={templates.data ?? []} onCreated={id => { setCampaignId(id); setShowComposer(false); void refresh(); }} />}
+      {showComposer && <CampaignComposer defaultScheduled={schedulingOnly} workspaceId={workspaceId} templates={templates.data ?? []} onCreated={id => { setCampaignId(id); setShowComposer(false); void refresh(); }} />}
       <label className="field">Кампания для управления<select value={campaignId} onChange={e => { setCampaignId(e.target.value); setApprove(false); }} disabled={busy}><option value="">Выберите кампанию</option>{campaigns.data?.map(item => <option key={item.id} value={item.id}>{item.name} — {statusNames[item.status] ?? item.status}</option>)}</select></label>
       {target ? <><p>{statusNames[target.status] ?? target.status} · Начало: {dateLabel(target.schedule_start)} · {target.sender_email}</p>
         <fieldset disabled={busy || !context.data?.can_manage} className="flex flex-wrap items-end gap-3">
@@ -125,6 +126,6 @@ export function AssistantPanel({ workspaceId, active, onEdit }: { workspaceId: s
           <button className="button" disabled={!sendAt || !["draft", "paused"].includes(target.status)} onClick={() => request(`/assistant/campaigns/${target.id}/propose`, { action: "reschedule", send_at: `${sendAt}:00+03:00` })}>Подготовить перенос</button>
         </fieldset><p className="hint">Эти кнопки только готовят предложение. Изменение произойдёт после подтверждения выше. После запуска сервер работает по расписанию даже при закрытом браузере.</p></> : <p className="hint">Выберите кампанию или создайте черновик рассылки из шаблонов и контактов.</p>}
     </section>
-    <section className="panel space-y-3"><h2 className="font-display text-xl font-bold">Моя история запросов</h2><button className="button" onClick={() => history.refetch()} disabled={busy}>Обновить историю</button>{!history.data?.length && <p className="hint">Здесь появятся последние 30 запросов текущего пользователя.</p>}<div className="space-y-2">{history.data?.map(item => <button key={item.id} className="block w-full rounded-lg border border-ink/15 p-3 text-left" disabled={busy} onClick={() => selectRun(item)}>{item.prompt.slice(0, 130)} <span className="hint">· {dateLabel(item.created_at)} · {item.status === "error" ? "Ошибка" : item.applied_at ? "Подтверждено" : item.status === "pending" ? "Обрабатывается" : "Готово"}</span></button>)}</div></section>
+    <section className="panel space-y-3" hidden={schedulingOnly}><h2 className="font-display text-xl font-bold">Моя история запросов</h2><button className="button" onClick={() => history.refetch()} disabled={busy}>Обновить историю</button>{!history.data?.length && <p className="hint">Здесь появятся последние 30 запросов текущего пользователя.</p>}<div className="space-y-2">{history.data?.map(item => <button key={item.id} className="block w-full rounded-lg border border-ink/15 p-3 text-left" disabled={busy} onClick={() => selectRun(item)}>{item.prompt.slice(0, 130)} <span className="hint">· {dateLabel(item.created_at)} · {item.status === "error" ? "Ошибка" : item.applied_at ? "Подтверждено" : item.status === "pending" ? "Обрабатывается" : "Готово"}</span></button>)}</div></section>
   </div>;
 }

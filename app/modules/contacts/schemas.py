@@ -80,6 +80,8 @@ class ContactListCreate(ContactListName):
 
 class ContactListResponse(ContactListName, ORMModel):
     id: UUID
+    supabase_table: str | None = None
+    supabase_synced_at: str | None = None
 
 
 class BulkResult(BaseModel):

@@ -57,9 +57,10 @@ class CampaignDraftRequest(BaseModel):
     name: str = Field(min_length=2, max_length=200)
     product_name: str = Field(min_length=2, max_length=200)
     template_ids: list[UUID] = Field(min_length=1, max_length=5)
-    contact_ids: list[UUID] = Field(min_length=1, max_length=1000)
+    contact_ids: list[UUID] = Field(min_length=1, max_length=50000)
     sender_email: EmailStr
     sender_name: str = Field(min_length=1, max_length=100)
     schedule_start: AwareDatetime
     delay_days: int = Field(default=3, ge=1, le=30)
     consent_confirmed: Literal[True]
+    launch_mode: Literal["draft", "scheduled"] = "draft"

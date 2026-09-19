@@ -5,6 +5,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import TenantContext, get_tenant_context
+from app.core.exceptions import AppError
 from app.core.pagination import Page, PageParams
 from app.database import get_db
 from app.modules.assistant.models import AssistantRun
@@ -32,24 +33,7 @@ async def eligible_contacts(
     tenant: TenantContext = Depends(get_tenant_context),
     db: AsyncSession = Depends(get_db),
 ):
-    filters = [
-        Contact.workspace_id == tenant.workspace_id,
-        Contact.is_unsubscribed.is_(False),
-        Contact.has_replied.is_(False),
-        Contact.status.notin_(["bounced", "meeting_booked"]),
-    ]
-    if list_id:
-        await ContactLists(db, tenant.workspace_id).get(list_id)
-        filters.append(Contact.tags.contains([list_tag(list_id)]))
-    if search.strip():
-        filters.append(
-            or_(
-                *(
-                    field.icontains(search.strip(), autoescape=True)
-                    for field in (Contact.email, Contact.full_name, Contact.company)
-                )
-            )
-        )
+    filters = await recipient_filters(db, tenant.workspace_id, search, list_id)
     total = await db.scalar(select(func.count()).select_from(Contact).where(*filters))
     rows = (
         await db.scalars(
@@ -137,3 +121,45 @@ async def create_campaign(
     db: AsyncSession = Depends(get_db),
 ):
     return await AssistantService(db, tenant).create_campaign(data)
+
+
+async def recipient_filters(
+    db: AsyncSession, workspace_id: UUID, search: str, list_id: UUID | None
+):
+    filters = [
+        Contact.workspace_id == workspace_id,
+        Contact.is_unsubscribed.is_(False),
+        Contact.has_replied.is_(False),
+        Contact.status.notin_(["bounced", "meeting_booked"]),
+    ]
+    if list_id:
+        await ContactLists(db, workspace_id).get(list_id)
+        filters.append(Contact.tags.contains([list_tag(list_id)]))
+    if search.strip():
+        filters.append(
+            or_(
+                *(
+                    field.icontains(search.strip(), autoescape=True)
+                    for field in (Contact.email, Contact.full_name, Contact.company)
+                )
+            )
+        )
+    return filters
+
+
+@router.get("/contacts/selection")
+async def select_recipients(
+    search: str = Query(default="", max_length=200),
+    list_id: UUID | None = None,
+    tenant: TenantContext = Depends(get_tenant_context),
+    db: AsyncSession = Depends(get_db),
+):
+    filters = await recipient_filters(db, tenant.workspace_id, search, list_id)
+    ids = list(
+        (
+            await db.scalars(select(Contact.id).where(*filters).order_by(Contact.id).limit(50_001))
+        ).all()
+    )
+    if len(ids) > 50_000:
+        raise AppError("В выборке больше 50 000 адресов. Выберите меньшую базу или уточните поиск.")
+    return {"contact_ids": ids, "total": len(ids)}

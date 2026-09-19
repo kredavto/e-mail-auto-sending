@@ -30,7 +30,7 @@ def test_replied_contact_stops_sequence() -> None:
 
 
 @pytest.mark.asyncio
-async def test_dispatch_due_enqueues_and_advances() -> None:
+async def test_dispatch_due_enqueues_without_advancing_before_delivery() -> None:
     now = datetime(2026, 9, 7, 7, tzinfo=UTC)
     workspace_id, campaign_id, contact_id, sequence_id, template_id = (
         uuid4(),
@@ -110,7 +110,8 @@ async def test_dispatch_due_enqueues_and_advances() -> None:
     queue = Mock()
     dispatched = await SchedulerService(db, queue).dispatch_due(now)
     assert dispatched == 1
-    assert row.status == "completed"
+    assert row.status == "queued"
+    assert row.current_step_index == 0
     queue.send_task.assert_called_once()
     assert queue.send_task.call_args.kwargs["queue"] == "emails"
 

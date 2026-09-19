@@ -3,12 +3,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.core.dependencies import TenantContext, get_tenant_context
 from app.core.events import IntegrationEvent, publish_enterprise_event
 from app.core.pagination import Page, PageParams
 from app.database import get_db
 from app.modules.audit.service import AuditService
 from app.modules.billing.service import BillingService
+from app.modules.contact_storage.service import table_name
 from app.modules.contacts.importing import prepare_import_rows
 from app.modules.contacts.lists import ContactLists
 from app.modules.contacts.repository import ContactRepository
@@ -201,7 +203,19 @@ async def create_segment(
 async def contact_lists(
     tenant: TenantContext = Depends(get_tenant_context), db: AsyncSession = Depends(get_db)
 ):
-    return await ContactLists(db, tenant.workspace_id).all()
+    rows = await ContactLists(db, tenant.workspace_id).all()
+    enabled = bool(get_settings().supabase_contact_storage_url)
+    return [
+        {
+            "id": row.id,
+            "name": row.name,
+            "supabase_synced_at": row.filters.get("supabase_synced_at") if enabled else None,
+            "supabase_table": (
+                "mailer_contacts." + table_name(row.name, row.id) if enabled else None
+            ),
+        }
+        for row in rows
+    ]
 
 
 @router.post("/lists", response_model=ContactListResponse, status_code=201)

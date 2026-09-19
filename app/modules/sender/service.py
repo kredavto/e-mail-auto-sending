@@ -19,6 +19,7 @@ from app.modules.campaigns.models import Campaign, CampaignContact
 from app.modules.contacts.models import Contact
 from app.modules.domains.models import SendingDomain
 from app.modules.products.models import Product
+from app.modules.sender.exceptions import DeliveryDeferred
 from app.modules.sender.models import EmailMessage
 from app.modules.sender.repository import MessageRepository
 from app.modules.sender.schemas import SendEmailRequest
@@ -104,7 +105,7 @@ class SenderService:
                 ),
             )
             if registered.current_daily_count >= effective_limit:
-                raise AppError(
+                raise DeliveryDeferred(
                     f"Дневной лимит {effective_limit} писем для домена {domain} исчерпан"
                 )
             registered.current_daily_count += 1
@@ -116,7 +117,7 @@ class SenderService:
             await redis.expire(key, 3700)
         await redis.aclose()
         if count > 50:
-            raise AppError(f"Лимит 50 писем/час для домена {domain} исчерпан")
+            raise DeliveryDeferred(f"Лимит 50 писем/час для домена {domain} исчерпан")
 
     async def send(self, data: SendEmailRequest) -> EmailMessage:
         campaign, contact = await self._validate_scope(data)

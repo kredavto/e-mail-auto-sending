@@ -67,6 +67,8 @@ class SchedulerService:
             if not campaign or not contact:
                 row.status = "invalid"
                 continue
+            if campaign.status == "scheduled":
+                campaign.status = "running"
             touched_campaigns[campaign.id] = campaign
             sequence = await self.db.get(Sequence, campaign.sequence_id)
             if not sequence or self.should_stop(contact, sequence.stop_conditions):
@@ -92,15 +94,8 @@ class SchedulerService:
                 queue="emails",
                 priority=9,
             )
-            row.current_step_index += 1
-            if row.current_step_index >= len(steps):
-                row.status = "completed"
-                row.next_send_at = None
-            else:
-                next_step = steps[row.current_step_index]
-                row.next_send_at = self.next_send_time(
-                    now, next_step.delay_days, sequence.send_window, next_step.send_hour
-                )
+            row.status = "queued"
+            row.next_send_at = None
             dispatched += 1
         if isinstance(self.db, AsyncSession):
             for campaign in touched_campaigns.values():
@@ -109,7 +104,7 @@ class SchedulerService:
                     .select_from(CampaignContact)
                     .where(
                         CampaignContact.campaign_id == campaign.id,
-                        CampaignContact.status == "active",
+                        CampaignContact.status.in_(["active", "queued"]),
                     )
                 )
                 if not active and campaign.status == "running":

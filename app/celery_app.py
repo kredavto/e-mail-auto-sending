@@ -8,6 +8,7 @@ settings = get_settings()
 celery_app = Celery("premium_mailer", broker=settings.redis_url, backend=settings.redis_url)
 celery_app.conf.update(
     include=[
+        "app.modules.contact_storage.tasks",
         "app.modules.sender.tasks",
         "app.modules.scheduler.tasks",
         "app.modules.queue.tasks",
@@ -65,9 +66,13 @@ celery_app.conf.update(
     task_acks_late=True,
     task_reject_on_worker_lost=True,
     beat_schedule={
-        "schedule-active-campaigns-hourly": {
+        "sync-contact-bases-to-supabase": {
+            "task": "app.modules.contact_storage.tasks.sync_contacts",
+            "schedule": 300.0,
+        },
+        "schedule-active-campaigns-every-minute": {
             "task": "app.modules.scheduler.tasks.schedule_campaigns",
-            "schedule": 3600.0,
+            "schedule": 60.0,
         },
         "check-bitrix-replies": {
             "task": "app.modules.bitrix24.tasks.check_incoming_replies",

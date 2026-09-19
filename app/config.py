@@ -7,6 +7,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    supabase_contact_storage_url: str = ""
+    supabase_contact_storage_token: SecretStr = SecretStr("")
+
     app_name: str = "Premium B2B Mailer"
     openai_api_key: SecretStr = SecretStr("")
     openai_model: str = "gpt-5.6-luna"

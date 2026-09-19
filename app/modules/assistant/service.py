@@ -4,7 +4,8 @@ from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
 from openai import APIConnectionError, APIStatusError, APITimeoutError, RateLimitError
-from sqlalchemy import func, select
+from sqlalchemy import any_, cast, func, select
+from sqlalchemy.dialects.postgresql import ARRAY, UUID as PGUUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -259,7 +260,7 @@ class AssistantService:
                 raise AppError("Приостановить можно только запущенную кампанию.")
         elif action.action == "reschedule":
             if campaign.status not in {"draft", "paused"} or any(
-                r.current_step_index for r in rows
+                r.current_step_index or r.status == "queued" for r in rows
             ):
                 raise AppError(
                     "Перенос доступен только в черновике/на паузе "
@@ -271,9 +272,9 @@ class AssistantService:
         else:
             if campaign.status not in {"draft", "paused", "scheduled"}:
                 raise AppError("Кампания уже запущена или завершена.")
-            if not rows or not any(r.status == "active" for r in rows):
+            if not rows or not any(r.status in {"active", "queued"} for r in rows):
                 raise AppError("В кампании нет активных получателей.")
-            if not any(r.current_step_index for r in rows):
+            if not any(r.current_step_index or r.status == "queued" for r in rows):
                 require_future(campaign.schedule_start)
             await self.validate_campaign(campaign, rows)
         return {
@@ -292,6 +293,8 @@ class AssistantService:
         }
 
     async def validate_campaign(self, campaign: Campaign, rows: list[CampaignContact]) -> None:
+        if not 1 <= len(rows) <= 50_000:
+            raise AppError("В одной рассылке должно быть от 1 до 50 000 получателей.")
         sequence = await self.db.scalar(
             select(Sequence).where(
                 Sequence.id == campaign.sequence_id, Sequence.workspace_id == self.workspace_id
@@ -347,12 +350,13 @@ class AssistantService:
             if not template:
                 raise AppError("Один из шаблонов удалён или недоступен.")
             required.update(template.variables)
-        ids = [r.contact_id for r in rows if r.status == "active"]
+        ids = [r.contact_id for r in rows if r.status in {"active", "queued"}]
         contacts = list(
             (
                 await self.db.scalars(
                     select(Contact).where(
-                        Contact.workspace_id == self.workspace_id, Contact.id.in_(ids)
+                        Contact.workspace_id == self.workspace_id,
+                        Contact.id == any_(cast(list(ids), ARRAY(PGUUID(as_uuid=True)))),
                     )
                 )
             ).all()
@@ -417,7 +421,11 @@ class AssistantService:
                 if recipient.status == "active":
                     recipient.next_send_at = action.send_at
         else:
-            campaign.status = "paused" if action.action == "pause" else "running"
+            campaign.status = (
+                "paused"
+                if action.action == "pause"
+                else "scheduled" if campaign.schedule_start > datetime.now(UTC) else "running"
+            )
         row.applied_at = datetime.now(UTC)
         await AuditService(self.db, self.workspace_id).log(
             "assistant." + action.action,
@@ -442,7 +450,8 @@ class AssistantService:
             (
                 await self.db.scalars(
                     select(Contact).where(
-                        Contact.workspace_id == self.workspace_id, Contact.id.in_(ids)
+                        Contact.workspace_id == self.workspace_id,
+                        Contact.id == any_(cast(list(ids), ARRAY(PGUUID(as_uuid=True)))),
                     )
                 )
             ).all()
@@ -523,8 +532,15 @@ class AssistantService:
             ]
         )
         await self.db.flush()
+        if data.launch_mode == "scheduled":
+            await self.validate_campaign(campaign, await self.recipients(campaign))
+            campaign.status = "scheduled"
         await AuditService(self.db, self.workspace_id).log(
-            "assistant.campaign_draft_created",
+            (
+                "assistant.campaign_scheduled"
+                if data.launch_mode == "scheduled"
+                else "assistant.campaign_draft_created"
+            ),
             "campaign",
             user_id=self.tenant.user.id,
             resource_id=campaign.id,

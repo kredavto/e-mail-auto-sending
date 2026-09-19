@@ -16,15 +16,22 @@ class SchedulerRepository:
             select(CampaignContact)
             .join(Campaign)
             .where(
-                Campaign.status == "running",
+                Campaign.status.in_(["running", "scheduled"]),
                 CampaignContact.status == "active",
                 CampaignContact.next_send_at <= now,
+                Campaign.schedule_start <= now,
             )
         )
         if self.workspace_id:
             query = query.where(Campaign.workspace_id == self.workspace_id)
         return list(
-            (await self.db.scalars(query.with_for_update(skip_locked=True).limit(limit))).all()
+            (
+                await self.db.scalars(
+                    query.order_by(CampaignContact.next_send_at, CampaignContact.id)
+                    .with_for_update(skip_locked=True)
+                    .limit(limit)
+                )
+            ).all()
         )
 
     async def upcoming(self, now: datetime, limit: int = 100) -> list[CampaignContact]:
@@ -32,7 +39,7 @@ class SchedulerRepository:
             select(CampaignContact)
             .join(Campaign)
             .where(
-                Campaign.status == "running",
+                Campaign.status.in_(["running", "scheduled"]),
                 CampaignContact.status == "active",
                 CampaignContact.next_send_at >= now,
             )
