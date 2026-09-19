@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { AssistantRun } from "./AssistantPanel";
-import type { MailTemplate } from "../lib/mailing";
+import { assistantTemplate, type MailTemplate } from "../lib/mailing";
 import { splitAssistantReplies } from "../lib/assistantReplies";
 
 type Context = { ai_configured: boolean; delivery_mode: string; counts: { contacts: number; templates: number; campaigns: number } };
@@ -19,7 +19,7 @@ const tips: Record<StudioSection, string> = {
 const welcome = "Здравствуйте! Я Ваш ИИ-помощник для навигации по сайту. Отвечу на Ваши вопросы, помогу создать шаблоны писем и настроить их автоматическую отправку по расписанию. Буду сопровождать каждый Ваш шаг и давать ценные подсказки. Подскажите, какой шаг Вы хотите сделать прямо сейчас: сделать черновик письма, проверить готовый шаблон письма, загрузить базу контактов, настроить время отправки писем?";
 const welcomeReplies = ["Сделать черновик письма", "Проверить готовый шаблон", "Загрузить базу контактов", "Настроить время отправки"];
 
-export function AssistantConcierge({ workspaceId, section, onNavigate, onEdit }: { workspaceId: string; section: StudioSection; onNavigate: (section: StudioSection) => void; onEdit: (template: MailTemplate) => boolean | void }) {
+export function AssistantConcierge({ workspaceId, section, onNavigate, onEdit, onDraft }: { workspaceId: string; section: StudioSection; onNavigate: (section: StudioSection) => void; onEdit: (template: MailTemplate) => boolean | void; onDraft: (template: MailTemplate) => void }) {
   const client = useQueryClient();
   const [open, setOpen] = useState(true);
   const [messages, setMessages] = useState<Message[]>([{ role: "assistant", text: welcome, replies: welcomeReplies }]);
@@ -60,6 +60,7 @@ export function AssistantConcierge({ workspaceId, section, onNavigate, onEdit }:
       const result = await api<AssistantRun>("/assistant/runs", { workspaceId, method: "POST", signal: request.current.signal, body: JSON.stringify({ mode: "draft", stage: "first_contact", prompt: drafting + choices + prompt + draftContext }) });
       if (!mounted.current) return;
       if (result.status === "error") throw new Error(result.result.message || "Помощник временно недоступен.");
+      if (result.result.draft) onDraft(assistantTemplate(result.result.draft));
       const { replies, nextSteps } = splitAssistantReplies(result.result.next_steps);
       setMessages(items => [...items, { role: "assistant", text: [result.result.message, ...nextSteps.map(step => `• ${step}`)].filter(Boolean).join("\n\n") || "Уточните, пожалуйста, какую задачу вы хотите решить?", replies, draft: result.result.draft ?? undefined }]);
       void client.invalidateQueries({ queryKey: ["assistant-history", workspaceId] });

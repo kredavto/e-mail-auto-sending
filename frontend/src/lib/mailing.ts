@@ -49,3 +49,7 @@ export function contactVariables(contact: Contact, productName: string): Record<
 export function interpolate(value: string, variables: Record<string, string>): string {
   return value.replace(/{{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}/g, (original, key) => variables[key] || original);
 }
+
+export function assistantTemplate(draft: { name: string; subject: string; category: Stage; editor_state: JSONContent }): MailTemplate {
+  return { id: "", name: draft.name, subject_template: draft.subject, category: draft.category, editor_state: draft.editor_state, version: 0, variables: [] };
+}

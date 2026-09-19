@@ -143,6 +143,13 @@ test("chat displays an actual draft, carries it into revisions and opens saved t
   await dialog.getByLabel("Сообщение помощнику").fill("Сделай его короче");
   await dialog.getByRole("button", { name: "Отправить", exact: true }).click();
   await expect(dialog.getByRole("region", { name: "Черновик письма" })).toHaveCount(2);
+  await dialog.getByRole("button", { name: "Свернуть помощника" }).click();
+  await page.getByRole("button", { name: "Редактор письма", exact: true }).click();
+  await expect(page.getByLabel("Тема письма", { exact: true })).toHaveValue(draft.subject);
+  await expect(page.locator(".tiptap")).toContainText(draft.paragraphs[0]);
+  await expect(page.getByLabel("Тема письма", { exact: true })).toBeInViewport();
+  expect(saves).toBe(0);
+  await page.getByRole("button", { name: "✧ ИИ-помощник", exact: true }).click();
   await dialog.getByRole("button", { name: "Сохранить и открыть в редакторе" }).last().click();
   await expect(dialog).not.toBeVisible();
   await expect(page.getByLabel("Тема письма", { exact: true })).toHaveValue(draft.subject);

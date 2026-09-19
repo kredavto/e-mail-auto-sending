@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { JSONContent } from "@tiptap/core";
 import { api } from "../lib/api";
-import { stages, type MailTemplate, type Stage } from "../lib/mailing";
+import { assistantTemplate, stages, type MailTemplate, type Stage } from "../lib/mailing";
 import { CampaignComposer } from "./CampaignComposer";
 
 type Action = { kind: "start" | "pause" | "reschedule"; campaign_id: string; campaign_name: string; send_at: string; recipients: number; sender_email: string; warning: string };
@@ -13,7 +13,7 @@ const actionNames = { start: "Запустить / возобновить", paus
 const statusNames: Record<string, string> = { draft: "Черновик", running: "Планировщик активен", paused: "На паузе", scheduled: "Запланирована", completed: "Завершена" };
 const dateLabel = (date: string) => new Date(date).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" }) + " МСК";
 
-export function AssistantPanel({ workspaceId, active, onEdit, schedulingOnly = false }: { workspaceId: string; active: boolean; schedulingOnly?: boolean; onEdit: (template: MailTemplate) => void }) {
+export function AssistantPanel({ workspaceId, active, onEdit, onDraft, schedulingOnly = false }: { workspaceId: string; active: boolean; schedulingOnly?: boolean; onEdit: (template: MailTemplate) => void; onDraft: (template: MailTemplate) => void }) {
   const client = useQueryClient();
   const [mode, setMode] = useState("draft");
   const [stage, setStage] = useState<Stage>("first_contact");
@@ -37,15 +37,16 @@ export function AssistantPanel({ workspaceId, active, onEdit, schedulingOnly = f
   const target = campaigns.data?.find(item => item.id === campaignId);
   function selectRun(item: AssistantRun) {
     setRun(item); setApprove(false);
+    if (item.result.draft) onDraft(assistantTemplate(item.result.draft));
     window.history.replaceState(null, "", `#assistant=${item.id}`);
   }
   useEffect(() => {
     if (!run && history.data) {
       const id = new URLSearchParams(window.location.hash.slice(1)).get("assistant");
       const saved = history.data.find(item => item.id === id);
-      if (saved) setRun(saved);
+      if (saved) { setRun(saved); if (saved.result.draft) onDraft(assistantTemplate(saved.result.draft)); }
     }
-  }, [history.data, run]);
+  }, [history.data, run, onDraft]);
   async function refresh() {
     await Promise.all(["assistant-history", "assistant-context", "campaigns", "templates"].map(key => client.invalidateQueries({ queryKey: [key, workspaceId] })));
   }

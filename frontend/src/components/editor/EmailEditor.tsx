@@ -89,7 +89,7 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
     if (!name.trim() || !subject.trim()) { setError("Заполните название шаблона и тему письма."); return; }
     setSaving(true); setError(""); setNotice("");
     try {
-      const saved = await api<MailTemplate>(template && !copy ? `/templates/${template.id}` : "/templates", { workspaceId, method: template && !copy ? "PATCH" : "POST", body: JSON.stringify({ name: name.trim(), category: stage, subject_template: subject, editor_state: withEmailStyle(withLetterType(editor.getJSON(), letterType), emailStyle) }) });
+      const saved = await api<MailTemplate>(template?.id && !copy ? `/templates/${template.id}` : "/templates", { workspaceId, method: template?.id && !copy ? "PATCH" : "POST", body: JSON.stringify({ name: name.trim(), category: stage, subject_template: subject, editor_state: withEmailStyle(withLetterType(editor.getJSON(), letterType), emailStyle) }) });
       onDirty(false); onSaved(saved); setNotice(`Шаблон сохранён на сервере · версия ${saved.version}`);
       await client.invalidateQueries({ queryKey: ["templates", workspaceId] });
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Ошибка сохранения"); }
@@ -131,14 +131,14 @@ export function EmailEditor({ workspaceId, template, contact, onSaved, onDirty, 
       <label className="field">Стадия применения<select value={stage} disabled={saving} onChange={e => { setStage(e.target.value as Stage); changed(); }}>{Object.entries(stages).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
       <button className="button primary" onClick={() => save()} disabled={!workspaceId || saving || uploading || showCta || !!typeIssue}>{saving ? "Сохраняем…" : "Сохранить шаблон"}</button>
       {template && <button className="button" onClick={() => save(true)} disabled={!workspaceId || saving || uploading || showCta || !!typeIssue}>Сохранить копию</button>}
-      <p className="hint w-full">{template ? `Версия ${template.version}. ` : "Новый шаблон. "}Сохраняйте изменения кнопкой выше.{!workspaceId && " Для сохранения войдите в рабочее пространство."}</p>
+      <p className="hint w-full">{template?.id ? `Версия ${template.version}. ` : "Новый шаблон. "}Сохраняйте изменения кнопкой выше.{!workspaceId && " Для сохранения войдите в рабочее пространство."}</p>
     </section>
     {error && <p role="alert" className="error-box">{error}</p>}{notice && <p role="status" className="success-box">{notice}</p>}
     {typeIssue && <p role="alert" className="error-box">{typeIssue}</p>}
     <EmailStylePanel value={emailStyle} disabled={saving || uploading || showCta} onChange={next => { setEmailStyle(next); changed(); }} />
     <SignaturePanel key={workspaceId} editor={editor} workspaceId={workspaceId} disabled={saving || uploading || showCta} onBusy={setUploading} />
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-      <section className="overflow-hidden rounded-2xl border border-ink/10 bg-white shadow-[0_18px_60px_rgba(20,32,25,.08)]">
+      <section id="letter-writing-area" className="scroll-mt-6 overflow-hidden rounded-2xl border border-ink/10 bg-white shadow-[0_18px_60px_rgba(20,32,25,.08)]">
         <div className="border-b border-ink/10 px-6 py-5"><label className="field">Тема письма<input value={subject} maxLength={255} disabled={saving} onChange={e => { setSubject(e.target.value); changed(); }} /></label></div>
         <fieldset disabled={saving || uploading || showCta} className="min-w-0 flex flex-wrap items-center gap-2 border-b border-ink/10 bg-paper/60 px-5 py-3">
           <button onClick={() => editor.chain().focus().toggleBold().run()} className="button" aria-pressed={editor.isActive("bold")}>Жирный</button>
