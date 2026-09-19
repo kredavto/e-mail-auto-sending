@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-test("onboarding greets once, navigates, carries conversation and clears on logout", async ({ page }) => {
+test("onboarding opens on verified entry, reopens after reload and clears on logout", async ({ page }) => {
   let calls = 0;
   let lastPrompt = "";
   await page.addInitScript(() => {
     localStorage.setItem("access_token", "test");
     localStorage.setItem("workspace_id", "space");
+    sessionStorage.setItem("mailer-guide-seen:space", "1");
   });
   await page.route("**/api/v1/**", route => {
     const path = new URL(route.request().url()).pathname;
@@ -26,7 +27,8 @@ test("onboarding greets once, navigates, carries conversation and clears on logo
   await page.goto("/");
   const dialog = page.getByRole("dialog", { name: "Ваш ИИ-помощник" });
   await expect(dialog).toBeVisible({ timeout: 8000 });
-  await expect(dialog).toContainText("У вас уже есть база CSV или Excel?");
+  await expect(dialog).toContainText("Здравствуйте! Я Ваш ИИ-помощник для навигации по сайту.");
+  await expect(dialog.getByRole("group", { name: "Варианты ответа" }).getByRole("button")).toHaveCount(4);
   expect(calls).toBe(0);
   await expect(dialog.locator(".concierge-actions")).toHaveCount(0);
   await dialog.getByRole("button", { name: "Свернуть помощника" }).click();
@@ -47,9 +49,8 @@ test("onboarding greets once, navigates, carries conversation and clears on logo
   expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   await dialog.getByRole("button", { name: "Свернуть помощника" }).click();
   await page.reload();
-  await expect(page.getByRole("button", { name: "✧ ИИ-помощник", exact: true })).toBeVisible();
-  await page.waitForTimeout(2800);
-  await expect(dialog).not.toBeVisible();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Свернуть помощника" }).click();
   await page.getByRole("button", { name: "Выйти", exact: true }).click();
   await expect(page.getByRole("button", { name: "✧ ИИ-помощник", exact: true })).not.toBeVisible();
 });
@@ -84,7 +85,7 @@ test("without AI configuration the guide still offers navigation", async ({ page
   await page.goto("/");
   const dialog = page.getByRole("dialog", { name: "Ваш ИИ-помощник" });
   await expect(dialog).toBeVisible({ timeout: 8000 });
-  await expect(dialog).toContainText("База и шаблоны уже есть");
+  await expect(dialog).toContainText("Буду сопровождать каждый Ваш шаг");
   await dialog.getByLabel("Сообщение помощнику").fill("Помоги подготовить рассылку");
   await dialog.getByRole("button", { name: "Отправить", exact: true }).click();
   await expect(dialog).toContainText("Свободный диалог с ИИ пока недоступен");
@@ -168,9 +169,9 @@ test("question choices send one reply and are replaced by the next question choi
   const dialog = page.getByRole("dialog", { name: "Ваш ИИ-помощник" });
   await expect(dialog).toBeVisible({ timeout: 8000 });
   await expect(dialog.getByRole("button", { name: "Настроить время отправки", exact: true })).toBeVisible();
-  await dialog.getByRole("button", { name: "Проверить письмо", exact: true }).click();
+  await dialog.getByRole("button", { name: "Проверить готовый шаблон", exact: true }).click();
   await expect(dialog.getByRole("button", { name: "Тему письма", exact: true })).toBeVisible();
-  expect(asks).toBe(1); expect(prompts[0]).toContain("Пользователь: Проверить письмо");
+  expect(asks).toBe(1); expect(prompts[0]).toContain("Пользователь: Проверить готовый шаблон");
   await expect(dialog.getByRole("button", { name: "Настроить время отправки", exact: true })).toHaveCount(0);
   await expect(dialog).not.toContainText("[answer]");
   await expect(dialog.getByRole("button", { name: "Проверьте факты перед отправкой." })).toHaveCount(0);

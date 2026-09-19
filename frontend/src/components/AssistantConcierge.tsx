@@ -16,20 +16,13 @@ const tips: Record<StudioSection, string> = {
   assistant: "Здесь ИИ готовит тексты и рекомендации. Расскажите, кому пишете, что предлагаете и какое действие ждёте от адресата.",
   campaigns: "Нажмите «Новая рассылка», выберите базу и шаблон, укажите отправителя и время МСК. На какую дату вы планируете отправку?",
 };
-function nextStep(context: Context): StudioSection {
-  if (!context.counts.contacts) return "contacts";
-  if (!context.counts.templates) return "editor";
-  return "campaigns";
-}
-function greeting(context: Context) {
-  const next = nextStep(context);
-  return `Здравствуйте! Помогу освоить сервис и подготовить первую рассылку. ${next === "contacts" ? "В этом пространстве пока нет контактов. У вас уже есть база CSV или Excel?" : next === "editor" ? "Контакты уже загружены. Для кого готовим письмо и что вы хотите предложить?" : "База и шаблоны уже есть. Хотите проверить письмо или настроить время отправки?"}`;
-}
+const welcome = "Здравствуйте! Я Ваш ИИ-помощник для навигации по сайту. Отвечу на Ваши вопросы, помогу создать шаблоны писем и настроить их автоматическую отправку по расписанию. Буду сопровождать каждый Ваш шаг и давать ценные подсказки. Подскажите, какой шаг Вы хотите сделать прямо сейчас: сделать черновик письма, проверить готовый шаблон письма, загрузить базу контактов, настроить время отправки писем?";
+const welcomeReplies = ["Сделать черновик письма", "Проверить готовый шаблон", "Загрузить базу контактов", "Настроить время отправки"];
 
 export function AssistantConcierge({ workspaceId, section, onNavigate, onEdit }: { workspaceId: string; section: StudioSection; onNavigate: (section: StudioSection) => void; onEdit: (template: MailTemplate) => boolean | void }) {
   const client = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [open, setOpen] = useState(true);
+  const [messages, setMessages] = useState<Message[]>([{ role: "assistant", text: welcome, replies: welcomeReplies }]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -38,33 +31,11 @@ export function AssistantConcierge({ workspaceId, section, onNavigate, onEdit }:
   const request = useRef<AbortController | null>(null);
   const inFlight = useRef(false);
   const mounted = useRef(true);
-  const greeted = useRef(false);
-  const seenKey = `mailer-guide-seen:${workspaceId}`;
   const context = useQuery({ queryKey: ["assistant-context", workspaceId], queryFn: ({ signal }) => api<Context>("/assistant/context", { workspaceId, signal }), staleTime: 30000, retry: false });
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; request.current?.abort(); }; }, []);
-  useEffect(() => {
-    if (!context.data?.counts || greeted.current) return;
-    greeted.current = true;
-    const next = nextStep(context.data);
-    const replies = next === "contacts" ? ["Есть CSV", "Есть Excel", "Базы пока нет"] : next === "editor" ? ["Предложить услугу", "Представить продукт", "Пригласить на встречу"] : ["Проверить письмо", "Настроить время отправки"];
-    setMessages([{ role: "assistant", text: greeting(context.data), replies }]);
-  }, [context.data]);
-  const ready = !!context.data?.counts;
-  useEffect(() => {
-    if (!ready) return;
-    try { if (sessionStorage.getItem(seenKey)) return; } catch { /* Storage is optional. */ }
-    const timer = window.setTimeout(() => {
-      try { if (sessionStorage.getItem(seenKey)) return; } catch { /* Storage is optional. */ }
-      // Offer once per workspace visit, without stealing focus from a form.
-      setOpen(true);
-      try { sessionStorage.setItem(seenKey, "1"); } catch { /* Storage is optional. */ }
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, [ready, seenKey]);
-  useEffect(() => { if (log.current) log.current.scrollTop = log.current.scrollHeight; }, [messages, busy, open]);
+  useEffect(() => { if (log.current) log.current.scrollTop = messages.length === 1 ? 0 : log.current.scrollHeight; }, [messages, busy, open]);
   function close() {
     setOpen(false);
-    try { sessionStorage.setItem(seenKey, "1"); } catch { /* Storage is optional. */ }
     launcher.current?.focus();
   }
   function explain(text: string) { setMessages(items => [...items, { role: "assistant", text }]); }
