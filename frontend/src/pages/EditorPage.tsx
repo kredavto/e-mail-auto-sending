@@ -10,7 +10,9 @@ import { StudioHero } from "../components/StudioHero";
 
 export function EditorPage() {
   const [tab, setTab] = useState<StudioSection>(window.location.hash.startsWith("#assistant=") ? "assistant" : "editor");
-  const [workspace, setWorkspace] = useState(localStorage.getItem("workspace_id") ?? "");
+  const [authenticated, setAuthenticated] = useState(false);
+  const [guestNoticeOpen, setGuestNoticeOpen] = useState(true);
+  const [workspace, setWorkspace] = useState(localStorage.getItem("access_token") ? localStorage.getItem("workspace_id") ?? "" : "");
   const [template, setTemplate] = useState<MailTemplate | null>(null);
   const [contact, setContact] = useState<Contact | null>(null);
   const [editorKey, setEditorKey] = useState(0);
@@ -29,19 +31,20 @@ export function EditorPage() {
     <StudioHero onStudio={() => setTab("editor")} />
     <main id="studio" className="studio-workspace" tabIndex={-1}>
       <aside className="studio-sidebar"><div className="sidebar-heading"><span className="sidebar-monogram" aria-hidden="true">M /</span><p>WORKSPACE<small>Ваша студия</small></p></div>
-        <nav aria-label="Разделы приложения" className="studio-nav">{[["contacts", "Контакты и импорт", "01", "База для новых диалогов"], ["templates", "Шаблоны писем", "02", "Библиотека вашего голоса"], ["editor", `Редактор письма${dirty ? " •" : ""}`, "03", "Текст, стиль и детали"], ["assistant", "ИИ-помощник", "04", "Идеи и расписание"], ["campaigns", "Рассылки по расписанию", "05", "До 50 000 получателей"]].map(([key, label, number, description]) => <button key={key} aria-label={label} aria-current={tab === key ? "page" : undefined} className="studio-nav-item" onClick={() => setTab(key as StudioSection)}><span className="nav-number" aria-hidden="true">{number}</span><span>{label}<small aria-hidden="true">{description}</small></span><span className="nav-arrow" aria-hidden="true">↗</span></button>)}</nav>
+        <nav aria-label="Разделы приложения" className="studio-nav">{[["contacts", "Контакты и импорт", "01", "База для новых диалогов"], ["templates", "Шаблоны писем", "02", "Библиотека вашего голоса"], ["editor", `Редактор письма${dirty ? " •" : ""}`, "03", "Текст, стиль и детали"], ["assistant", "ИИ-помощник", "04", "Идеи и расписание"], ["campaigns", "Рассылки по расписанию", "05", "До 50 000 получателей"]].map(([key, label, number, description]) => <button key={key} aria-label={label} aria-current={tab === key ? "page" : undefined} className="studio-nav-item" disabled={key === "assistant" && !authenticated} title={key === "assistant" && !authenticated ? "Войдите или зарегистрируйтесь, чтобы включить ИИ-помощника" : undefined} onClick={() => setTab(key as StudioSection)}><span className="nav-number" aria-hidden="true">{number}</span><span>{label}<small aria-hidden="true">{description}</small></span><span className="nav-arrow" aria-hidden="true">↗</span></button>)}</nav>
         <div className="sidebar-note"><span aria-hidden="true">✧</span><p>Внимание к деталям.<small>Проверьте письмо перед отправкой. Сильное впечатление начинается с точности.</small></p></div>
       </aside>
       <div className="studio-content"><div className="workspace-heading"><div><p>PREMIUM B2B MAILER</p><h2>Пространство ваших идей</h2></div><span className="workspace-tag">Творчество. Под контролем.</span></div>
-    <AccountPanel workspaceId={workspace} onChange={(id, preserveDraft) => { setWorkspace(id); if (preserveDraft) return; setTemplate(null); setContact(null); setEditorKey(key => key + 1); setDirty(false); }} />
-    {tab === "campaigns" && <div className="workspace-view"><AssistantPanel key={`campaigns-${workspace}`} workspaceId={workspace} active schedulingOnly onEdit={edit} /></div>}
-    <div className="workspace-view" hidden={tab !== "assistant"}><AssistantPanel key={`assistant-${workspace}`} workspaceId={workspace} active={tab === "assistant"} onEdit={edit} /></div>
+    <AccountPanel onAuthenticated={setAuthenticated} workspaceId={workspace} onChange={(id, preserveDraft) => { setWorkspace(id); if (preserveDraft) return; setTemplate(null); setContact(null); setEditorKey(key => key + 1); setDirty(false); }} />
+    {authenticated && tab === "campaigns" && <div className="workspace-view"><AssistantPanel key={`campaigns-${workspace}`} workspaceId={workspace} active schedulingOnly onEdit={edit} /></div>}
+    <div className="workspace-view" hidden={tab !== "assistant"}>{authenticated ? <AssistantPanel key={`assistant-${workspace}`} workspaceId={workspace} active={tab === "assistant"} onEdit={edit} /> : <section className="panel">ИИ-помощник доступен после входа в личный кабинет. <a href="#account" className="underline">Войти или зарегистрироваться</a></section>}</div>
     <div className="workspace-view" hidden={tab !== "contacts"}><ContactsPanel key={`contacts-${workspace}`} workspaceId={workspace} onPreview={item => { setContact(item); setTab("editor"); }} /></div>
     <div className="workspace-view" hidden={tab !== "templates"}><TemplatesPanel key={`templates-${workspace}`} workspaceId={workspace} onEdit={edit} /></div>
     <div className="workspace-view" hidden={tab !== "editor"}><EmailEditor key={editorKey} workspaceId={workspace} template={template} contact={contact} onSaved={setTemplate} onDirty={setDirty} onChooseContact={() => setTab("contacts")} /></div>
       </div>
     </main>
-    {workspace && <AssistantConcierge key={workspace} workspaceId={workspace} section={tab} onNavigate={target => { setTab(target); document.getElementById("studio")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />}
+    {!authenticated && guestNoticeOpen && <aside className="assistant-guest-notice" aria-label="Доступ к ИИ-помощнику"><button type="button" className="guest-notice-close" aria-label="Закрыть подсказку о входе" onClick={() => setGuestNoticeOpen(false)}>×</button><p>Чтобы вступить в диалог с ИИ-помощником, зарегистрируйтесь и войдите в свой аккаунт в личном кабинете.</p><a className="button primary" href="#account" onClick={() => setGuestNoticeOpen(false)}>Войти / Зарегистрироваться</a></aside>}
+    {authenticated && workspace && <AssistantConcierge key={workspace} workspaceId={workspace} section={tab} onNavigate={target => { setTab(target); document.getElementById("studio")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />}
     <footer className="studio-footer"><span>PREMIUM B2B MAILER</span><p>Ваш бизнес заслуживает красивых писем.</p><a href="#studio">Вернуться в студию ↑</a></footer>
   </div>;
 }

@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api, SESSION_EXPIRED_EVENT } from "../lib/api";
 
 type Workspace = { id: string; name: string };
-export function AccountPanel({ workspaceId, onChange }: { workspaceId: string; onChange: (id: string, preserveDraft?: boolean) => void }) {
+export function AccountPanel({ workspaceId, onChange, onAuthenticated }: { workspaceId: string; onAuthenticated: (value: boolean) => void; onChange: (id: string, preserveDraft?: boolean) => void }) {
   const [loggedIn, setLoggedIn] = useState(!!localStorage.getItem("access_token"));
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [register, setRegister] = useState(false);
@@ -17,6 +17,7 @@ export function AccountPanel({ workspaceId, onChange }: { workspaceId: string; o
   const [notice, setNotice] = useState("");
   useEffect(() => {
     const expired = () => {
+      onAuthenticated(false);
       loaded.current = false; recovering.current = true;
       setLoggedIn(false); setWorkspaces([]); setRegister(false); setError("");
       setNotice("Сессия завершена. Войдите снова, чтобы продолжить. Текст открытого письма сохранён в редакторе.");
@@ -24,15 +25,17 @@ export function AccountPanel({ workspaceId, onChange }: { workspaceId: string; o
       panel.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       panel.current?.querySelector<HTMLInputElement>('input[name="email"]')?.focus();
     };
+    const storage = (event: StorageEvent) => { if ((event.key === "access_token" || event.key === null) && !localStorage.getItem("access_token")) expired(); };
     window.addEventListener(SESSION_EXPIRED_EVENT, expired);
-    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, expired);
-  }, [client, onChange]);
+    window.addEventListener("storage", storage);
+    return () => { window.removeEventListener(SESSION_EXPIRED_EVENT, expired); window.removeEventListener("storage", storage); };
+  }, [client, onChange, onAuthenticated]);
   useEffect(() => {
     if (!loggedIn || loaded.current) return;
     let active = true;
-    api<Workspace[]>("/workspaces").then(items => { if (active) setWorkspaces(items); }).catch(reason => { if (active && localStorage.getItem("access_token")) setError(reason.message); });
+    api<Workspace[]>("/workspaces").then(items => { if (active) { setWorkspaces(items); onAuthenticated(true); } }).catch(reason => { if (active && localStorage.getItem("access_token")) setError(reason.message); });
     return () => { active = false; };
-  }, [loggedIn]);
+  }, [loggedIn, onAuthenticated]);
   function selectWorkspace(id: string, preserveDraft = false) {
     client.clear();
     if (id) localStorage.setItem("workspace_id", id); else localStorage.removeItem("workspace_id");
@@ -63,6 +66,7 @@ export function AccountPanel({ workspaceId, onChange }: { workspaceId: string; o
       if (tokens.mfa_required) throw new Error("Введите шестизначный код 2FA и нажмите «Войти» ещё раз.");
       localStorage.setItem("access_token", tokens.access_token);
       localStorage.setItem("refresh_token", tokens.refresh_token);
+      onAuthenticated(true);
       loaded.current = true;
       client.clear(); localStorage.removeItem("workspace_id"); setLoggedIn(true); setNotice("");
       if (creatingAccount) {
@@ -86,6 +90,7 @@ export function AccountPanel({ workspaceId, onChange }: { workspaceId: string; o
     finally { setBusy(false); }
   }
   async function logout() {
+    onAuthenticated(false);
     setBusy(true); setError("");
     try {
       const refresh = localStorage.getItem("refresh_token");

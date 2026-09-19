@@ -56,10 +56,17 @@ test("onboarding greets once, navigates, carries conversation and clears on logo
 test("guests get no popup or assistant API requests", async ({ page }) => {
   let requests = 0;
   await page.route("**/api/v1/assistant/**", route => { requests++; return route.fulfill({ json: {} }); });
-  await page.goto("/");
+  await page.addInitScript(() => localStorage.setItem("workspace_id", "stale-space"));
+  await page.goto("/#assistant=old-run");
+  await expect(page.getByRole("button", { name: "ИИ-помощник", exact: true })).toBeDisabled();
+  await expect(page.getByText("ИИ-помощник доступен после входа в личный кабинет.", { exact: false })).toBeVisible();
   await page.waitForTimeout(2800);
   await expect(page.getByRole("dialog", { name: "Ваш ИИ-помощник" })).not.toBeVisible();
   expect(requests).toBe(0);
+  const notice = page.getByRole("complementary", { name: "Доступ к ИИ-помощнику" });
+  await expect(notice).toContainText("зарегистрируйтесь и войдите");
+  await notice.getByRole("link", { name: "Войти / Зарегистрироваться" }).click();
+  await expect(page.getByRole("form", { name: "Вход", exact: true })).toBeInViewport();
 });
 
 test("without AI configuration the guide still offers navigation", async ({ page }) => {
@@ -81,4 +88,22 @@ test("without AI configuration the guide still offers navigation", async ({ page
   await dialog.getByRole("button", { name: "Отправить", exact: true }).click();
   await expect(dialog).toContainText("Свободный диалог с ИИ пока недоступен");
   expect(posts).toBe(0);
+});
+
+
+test("stored credentials do not enable AI before server verifies the session", async ({ page }) => {
+  let assistantRequests = 0;
+  await page.addInitScript(() => { localStorage.setItem("access_token", "stale"); localStorage.setItem("workspace_id", "space"); });
+  await page.route("**/api/v1/**", async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.includes("/assistant/")) assistantRequests++;
+    if (path.endsWith("/workspaces")) return route.fulfill({ status: 503, json: { detail: "Сервер временно недоступен" } });
+    if (path.endsWith("/contacts")) return route.fulfill({ json: { items: [], total: 0 } });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/#assistant=old-run");
+  await expect(page.getByRole("alert")).toContainText("Сервер временно недоступен");
+  await expect(page.getByRole("button", { name: "ИИ-помощник", exact: true })).toBeDisabled();
+  await expect(page.getByRole("dialog", { name: "Ваш ИИ-помощник" })).not.toBeVisible();
+  expect(assistantRequests).toBe(0);
 });

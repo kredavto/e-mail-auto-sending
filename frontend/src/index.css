@@ -147,3 +147,11 @@ html:has(.studio-intro[data-motion="off"]) { scroll-behavior: auto; }
 .concierge-hint { padding: 0 16px 12px; font-size: 11px; color: #606876; }.concierge-error { padding: 8px 16px; font-size: 13px; color: #9a3412; }
 .assistant-concierge :is(button, textarea, summary):focus-visible { outline: 2px solid #93713c; outline-offset: 3px; }
 @media (max-width: 540px) { .assistant-concierge { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); }.concierge-dialog { width: calc(100vw - 24px); }.concierge-launcher { padding: 10px 16px; } }
+
+.studio-nav-item:disabled { opacity: .45; cursor: not-allowed; }
+
+.assistant-guest-notice { position: fixed; right: 24px; bottom: max(20px, env(safe-area-inset-bottom)); z-index: 60; width: min(340px, calc(100vw - 32px)); padding: 18px; border: 1px solid #d6c6a5; border-radius: 16px; background: #fffdf8; color: #202630; box-shadow: 0 8px 32px #12171e25; font-size: 14px; line-height: 1.5; }
+.assistant-guest-notice .button { display: inline-block; margin-top: 12px; }
+@media (max-width: 540px) { .assistant-guest-notice { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); padding: 14px; font-size: 13px; } }
+
+.guest-notice-close { float: right; width: 28px; height: 28px; margin: -6px -6px 4px 6px; font-size: 22px; color: #606876; }

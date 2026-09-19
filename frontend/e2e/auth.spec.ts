@@ -7,6 +7,7 @@ test("expired refresh token opens sign-in, removes stale credentials and support
   });
   await page.route("**/api/v1/**", route => {
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/assistant/context")) return route.fulfill({ json: { ai_configured: false, counts: { contacts: 0, templates: 0, campaigns: 0 } } });
     if (path.endsWith("/auth/refresh")) { refreshes++; return route.fulfill({ status: 401, json: { detail: "expired" } }); }
     if (path.endsWith("/auth/login")) return route.fulfill({ json: { access_token: "new", refresh_token: "new-refresh", mfa_required: false } });
     if (route.request().headers().authorization !== "Bearer new") return route.fulfill({ status: 401, json: {} });
@@ -31,6 +32,7 @@ test("registration validates matching passwords, signs in and creates a workspac
   const calls: string[] = [];
   await page.route("**/api/v1/**", route => {
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/assistant/context")) return route.fulfill({ json: { ai_configured: false, counts: { contacts: 0, templates: 0, campaigns: 0 } } });
     if (path.endsWith("/auth/register")) {
       calls.push("register");
       expect(route.request().postDataJSON()).toMatchObject({ email: "user@example.com", full_name: "Иван Петров" });
@@ -70,6 +72,7 @@ for (const status of [200, 503]) test(`refresh ${status} preserves the session w
   });
   await page.route("**/api/v1/**", route => {
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/assistant/context")) return route.fulfill({ json: { ai_configured: false, counts: { contacts: 0, templates: 0, campaigns: 0 } } });
     if (path.endsWith("/auth/refresh")) { refreshes++; return route.fulfill({ status, json: status === 200 ? { access_token: "new", refresh_token: "rotated" } : {} }); }
     if (route.request().headers().authorization === "Bearer old") return route.fulfill({ status: 401, json: {} });
     if (path.endsWith("/workspaces")) return route.fulfill({ json: [{ id: "workspace", name: "Компания" }] });
